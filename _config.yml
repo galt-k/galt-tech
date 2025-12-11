@@ -1,49 +1,9 @@
 title: Galt's Gulch Code
-description: Critical evaluations of programming languages, systems design, and zero-cost abstractions.
-author: Galt K                          # Change to your name/handle
-email: your-email@example.com           # Optional
+description: Critical evaluations of programming languages and systems design
+author: Galt K  # Change to your name
 
-# Use the powerful Minimal Mistakes remote theme
-remote_theme: mmistakes/minimal-mistakes@4.26.1   # Stable version, works great on GitHub Pages
+# Built-in theme: Clean, professional, with code highlighting (no remote deps)
+theme: jekyll-theme-cayman
 
-# Minimal Mistakes settings (fancy defaults)
-minimal_mistakes_skin: "contrast"       # Options: air, contrast, dark, dirt, mint, plum, sunrise (try "dark" for sci-fi vibe)
-
-plugins:
-  - jekyll-feed
-  - jekyll-seo-tag
-  -_laid_out:
-    - jekyll-include-cache
-
-# Defaults for posts
-defaults:
-  - scope:
-      path: ""
-      type: posts
-    values:
-      layout: single
-      read_time: true
-      comments: false
-      share: true
-      author_profile: true
-      toc: true                         # Table of contents for long articles (great for tech posts!)
-
-# Site features
-logo: /assets/images/logo.png           # Optional: add a logo later (e.g., sci-fi/Ayn Rand inspired)
-breadcrumbs: true
-search: true                            # Full-text search (works on GitHub Pages)
-show_excerpts: true
-
-# Footer & social links (customize as needed)
-footer:
-  links:
-    - label: "GitHub"
-      icon: "fab fa-github"
-      url: "https://github.com/galt-k"
-    - label: "X (Twitter)"
-      icon: "fab fa-twitter"
-      url: "https://twitter.com/yourhandle"
-
-# Analytics (optional, remove if not wanted)
-analytics:
-  provider: false                       # Set to "google" or "custom" later if desired
+# Safe built-in extras only
+show_excerpts: true  # Previews on home
