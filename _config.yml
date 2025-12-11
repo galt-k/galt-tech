@@ -1,9 +1,7 @@
+remote_theme: kitian616/jekyll-TeXt-theme
+plugins:
+  - jekyll-remote-theme
+
 title: Galt's Gulch Code
-description: Critical evaluations of programming languages and systems design
-author: Galt K  # Change to your name
-
-# Built-in theme: Clean, professional, with code highlighting (no remote deps)
-theme: jekyll-theme-cayman
-
-# Safe built-in extras only
-show_excerpts: true  # Previews on home
+description: Critical evaluations...
+skin: orange   # Try "ocean" for blue or "default" for bright mix
