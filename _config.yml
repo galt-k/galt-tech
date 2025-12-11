@@ -1,15 +1,49 @@
 title: Galt's Gulch Code
-description: Critical evaluations of programming languages and systems design
-email: your-email@example.com  # optional, can leave or remove
-author: Your Name              # optional, change to your name/handle
+description: Critical evaluations of programming languages, systems design, and zero-cost abstractions.
+author: Galt K                          # Change to your name/handle
+email: your-email@example.com           # Optional
 
-# Best simple built-in theme (clean, readable, dark mode support)
-theme: jekyll-theme-minimal
+# Use the powerful Minimal Mistakes remote theme
+remote_theme: mmistakes/minimal-mistakes@4.26.1   # Stable version, works great on GitHub Pages
 
-# Optional extras (all safe on GitHub Pages)
-show_excerpts: true            # shows preview on home page
-header_pages:
-  - about.md                   # add an about page later if you want
+# Minimal Mistakes settings (fancy defaults)
+minimal_mistakes_skin: "contrast"       # Options: air, contrast, dark, dirt, mint, plum, sunrise (try "dark" for sci-fi vibe)
 
-# Syntax highlighting (built-in)
-highlighter: rouge
+plugins:
+  - jekyll-feed
+  - jekyll-seo-tag
+  -_laid_out:
+    - jekyll-include-cache
+
+# Defaults for posts
+defaults:
+  - scope:
+      path: ""
+      type: posts
+    values:
+      layout: single
+      read_time: true
+      comments: false
+      share: true
+      author_profile: true
+      toc: true                         # Table of contents for long articles (great for tech posts!)
+
+# Site features
+logo: /assets/images/logo.png           # Optional: add a logo later (e.g., sci-fi/Ayn Rand inspired)
+breadcrumbs: true
+search: true                            # Full-text search (works on GitHub Pages)
+show_excerpts: true
+
+# Footer & social links (customize as needed)
+footer:
+  links:
+    - label: "GitHub"
+      icon: "fab fa-github"
+      url: "https://github.com/galt-k"
+    - label: "X (Twitter)"
+      icon: "fab fa-twitter"
+      url: "https://twitter.com/yourhandle"
+
+# Analytics (optional, remove if not wanted)
+analytics:
+  provider: false                       # Set to "google" or "custom" later if desired
