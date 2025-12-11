@@ -1,17 +1,40 @@
 title: Galt's Gulch Code
 description: Critical evaluations of programming languages and systems design
+author:
+  name: "Galt K"  # Your name/handle
+  avatar: "/assets/images/logo.png"  # Optional: Add a profile image later
 
-# Upgrade to fancy theme
-remote_theme: mmistakes/minimal-mistakes@4.26.1  # Latest stable version
+# Remote theme: Modern, feature-rich for tech blogs
+remote_theme: mmistakes/minimal-mistakes@4.26.1  # Stable version
 
 plugins:
   - jekyll-remote-theme
-  - jekyll-include-cache  # Optional but recommended for speed
+  - jekyll-feed
+  - jekyll-seo-tag
+  - jekyll-include-cache  # Improves build speed
 
-# Theme skin (try "dark" for sci-fi vibe or "contrast" for bold)
+# Theme skin: "contrast" for bold colors; try "dark" for sci-fi vibe
 minimal_mistakes_skin: "contrast"
 
-# Enable features
-search: true
-breadcrumbs: true
-toc: true  # Table of contents—great for your long article!
+# Key features for your article
+toc: true  # Auto table of contents (great for sections like Problem Description)
+toc_label: "On This Page"
+toc_icon: "cog"  # Optional icon
+
+search: true  # Site search bar
+breadcrumbs: true  # Breadcrumb navigation
+sidebar:
+  nav: "sidebar-main"  # Optional sidebar for categories
+
+# Defaults for posts (applies to your article)
+defaults:
+  - scope:
+      path: ""
+      type: posts
+    values:
+      layout: single  # Full-width post layout
+      author_profile: true
+      read_time: true
+      comments: false
+      share: true
+      related: true  # Related posts at bottom
