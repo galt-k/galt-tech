@@ -1,6 +1,14 @@
-remote_theme: pages-themes/dinky@v0.2.0
-plugins:
-  - jekyll-remote-theme
-
+---
 title: Galt's Gulch Code
-description: Critical evaluations...
+description: Critical evaluations of programming languages and systems design
+
+# Built-in theme
+theme: jekyll-theme-cayman  # Or your current one (e.g., minimal)
+
+# Key: Enable post processing and excerpts
+show_excerpts: true
+exclude:
+  - /vendor
+include:
+  - _posts
+---
