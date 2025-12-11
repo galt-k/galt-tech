@@ -1,14 +1,17 @@
----
 title: Galt's Gulch Code
 description: Critical evaluations of programming languages and systems design
 
-# Built-in theme
-theme: jekyll-theme-cayman  # Or your current one (e.g., minimal)
+# Upgrade to fancy theme
+remote_theme: mmistakes/minimal-mistakes@4.26.1  # Latest stable version
 
-# Key: Enable post processing and excerpts
-show_excerpts: true
-exclude:
-  - /vendor
-include:
-  - _posts
----
+plugins:
+  - jekyll-remote-theme
+  - jekyll-include-cache  # Optional but recommended for speed
+
+# Theme skin (try "dark" for sci-fi vibe or "contrast" for bold)
+minimal_mistakes_skin: "contrast"
+
+# Enable features
+search: true
+breadcrumbs: true
+toc: true  # Table of contents—great for your long article!
