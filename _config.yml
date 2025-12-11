@@ -1,3 +1,15 @@
 title: Galt's Gulch Code
-description: Critical evaluations of programming languages and systems
-theme: jekyll-theme-minimal   # Simple, clean, code-friendly theme built-in
+description: Critical evaluations of programming languages and systems design
+email: your-email@example.com  # optional, can leave or remove
+author: Your Name              # optional, change to your name/handle
+
+# Best simple built-in theme (clean, readable, dark mode support)
+theme: jekyll-theme-minimal
+
+# Optional extras (all safe on GitHub Pages)
+show_excerpts: true            # shows preview on home page
+header_pages:
+  - about.md                   # add an about page later if you want
+
+# Syntax highlighting (built-in)
+highlighter: rouge
