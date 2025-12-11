@@ -1,5 +1,6 @@
 ---
-title: Critical Evaluation: Generics in Rust vs Java
+layout: post
+title: "Critical Evaluation: Generics in Rust vs Java"
 date: 2025-12-11
 ---
 

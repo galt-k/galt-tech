@@ -3,4 +3,4 @@
 Critical, no-compromise explorations of Rust, Java, and systems programming.
 
 ## Latest Article
-[Critical Evaluation: Generics in Rust vs Java](/2025-12-11-rust-vs-java-generics.md)
+[Read the article](/2025-12-11-rust-vs-java-generics)
