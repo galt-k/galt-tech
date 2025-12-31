@@ -154,3 +154,54 @@ where
     })
 }
 ```
+
+## Add Concurrency Safety with Send and Sync
+The Send + Sync bounds on T ensure the engine type is safe to share across the threads. 
+```rust
+async fn assemble_car<T>(engine: T) -> ThreadSafeCar<T>
+where
+    T: Send + Sync + GetMetadata + Clone + 'static + Debug,
+{
+    let car = Arc::new(ThreadSafeCar {
+        id: 1,
+        name: "Ford Mustang".to_string(),
+        engine: Mutex::new(None),
+        tyres: Mutex::new(0),
+        seats: Mutex::new(0),
+    });
+
+    let car1 = Arc::clone(&car);
+    let car2 = Arc::clone(&car);
+    let car3 = Arc::clone(&car);
+
+    let engine_task = task::spawn(async move {
+        install_engine(car1, engine).await;
+    });
+
+    let tyres_task = task::spawn(async move {
+        install_tyres(car2).await;
+    });
+
+    let seats_task = task::spawn(async move {
+        install_seats(car3).await;
+    });
+
+    let _ = tokio::try_join!(engine_task, tyres_task, seats_task);
+
+    Arc::try_unwrap(car).unwrap()
+}
+```
+## Add Closures to generics
+Rust allows functions to be generic not only over types but also over behavior, by accepting closures as parameters with trait bounds like Fn. This enables powerful, flexible algorithms that work with any callable meeting the required signature.
+
+```rust
+fn apply_calibration<T , A>(vehicle: &mut T, algorithm: A) 
+where T: GetMetadata  + Calibrate + Clone,
+      A: Fn(&T) -> i32 
+{
+    // Apply the algotihm on the vehicel type
+    let calibration_specifc = algorithm(vehicle);
+    vehicle.set_calibration(calibration_specifc);
+}
+```
+The generic parameter A is bounded by Fn(&T) -> i32, meaning any closure (or function) that takes an immutable reference to T and returns an i32 can be passed. This decouples the calibration logic from the vehicle type, allowing custom algorithms to be injected at the call site.
