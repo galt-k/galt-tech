@@ -271,3 +271,17 @@ where T: GetMetadata  + Calibrate + Clone,
 }
 ```
 The generic parameter A is bounded by Fn(&T) -> i32, meaning any closure (or function) that takes an immutable reference to T and returns an i32 can be passed. This decouples the calibration logic from the vehicle type, allowing custom algorithms to be injected at the call site.
+```java
+public static <T extends GetMetadata & Calibrate & Cloneable> void applyCalibration(
+        T vehicle,
+        Function<T, Integer> algorithm
+) {
+    // 1. The Worker executes the algorithm provided by the Master
+    // This is Dynamic Dispatch: algorithm is an object, .apply() is a virtual call
+    Integer calibrationSpecific = algorithm.apply(vehicle);
+    // create the calibration object here and pass it to setcalibration
+    Calibration new_calibration = new Calibration(calibrationSpecific);
+    // 2. Apply the result to the vehicle
+    vehicle.setCalibration(new_calibration);
+}
+```
