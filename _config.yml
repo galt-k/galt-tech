@@ -41,14 +41,21 @@ sidebar:
   nav: "sidebar-main"  # Optional sidebar for categories
 
 # Defaults for posts (applies to your article)
+# Defaults for posts and pages
 defaults:
   - scope:
       path: ""
       type: posts
     values:
-      layout: single  # Full-width post layout
+      layout: single
       author_profile: true
       read_time: true
       comments: false
       share: true
-      related: true  # Related posts at bottom
+      related: true
+  - scope:
+      path: ""
+      type: pages # This targets index.md
+    values:
+      layout: single
+      author_profile: true
