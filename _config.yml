@@ -8,9 +8,9 @@ permalink: /:categories/:title/
 title: Galt's Gulch Code
 description: Critical evaluations of programming languages and systems design
 author:
-  name: "Galt K"  # Your name/handle
-  avatar: "/assets/images/logo.png"  # Optional: Add a profile image later
-  links:
+  name: "Galt K"
+  avatar: "/assets/images/logo.png"
+  links: # Must be indented exactly 2 spaces from 'author'
     - label: "X (formerly Twitter)"
       icon: "fab fa-fw fa-x-twitter"
       url: "https://twitter.com/rrk_tweets"

@@ -1,5 +1,6 @@
 ---
 layout: default  # Ensures home uses theme's default layout
+author_profile: true
 ---
 
 # Welcome to Galt's Gulch Code
