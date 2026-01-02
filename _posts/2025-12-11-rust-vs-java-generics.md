@@ -6,8 +6,6 @@ tags: [rust, java, generics]
 toc: true  # Enables TOC for this post
 ---
 
-# Critical Evaluation: Generics in Rust vs Java
-
 ## Introduction
 This article provides a critical evaluation of the **generics** feature in Rust and Java. The goal is not to declare one language is superior over other, but to examine this specific mechanism objectively, highlighting the strengths and limitations in each lanugage. 
 
