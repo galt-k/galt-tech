@@ -1,5 +1,10 @@
 url: "https://galt-k.github.io"
 baseurl: "/galt-tech"
+breadcrumbs: false 
+
+# This gives you clean, professional URLs without the dates
+permalink: /:categories/:title/
+
 title: Galt's Gulch Code
 description: Critical evaluations of programming languages and systems design
 author:
