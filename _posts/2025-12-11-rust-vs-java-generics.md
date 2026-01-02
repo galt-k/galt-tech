@@ -21,7 +21,7 @@ This article takes a hands-on approach to understanding Rust's generics by build
 
 The example revolves around vehicles (primarily cars) that can be equipped with different kinds of engines. Engines are modeled with multiple classifications, and the factory can produce batches of vehicles while supporting various customization and viewing patterns.
 
-## Adding Generics to a Struct
+## Adding Generics to a Struct vs Class
 The foundation of our system is a `Car` struct that can hold any type of engine, as long as that engine provides metadata.
 
 By making `Car` generic over `T`, we allow the same vehicle struct to work with different engine representations without duplicating code.
@@ -43,7 +43,44 @@ where
 }
 ```
 The where T: GetMetadata bound ensures that whatever engine type we use must be able to provide a name and ID — enforcing consistency at compile time while keeping the struct flexible.
+```java
+class Car<T extends GetMetadata> implements GetMetadata, Buildable<T>, Copyable<Car<T>> {
+    private int id;
+    private Optional<T> engine;
+    private final String name;
 
+    // Constructor: Initialize with the name, leave others for the build step
+    public Car(String name) {
+        this.name = name;
+        this.engine = Optional.empty();
+        this.id = 0;
+    }
+
+    @Override
+    public String getName() {
+        return this.name;
+    }
+
+    @Override
+    public int getId() {
+        return this.id;
+    }
+
+    @Override
+    public void build(T engine, int id) {
+        // Now this is legal because fields are not final
+        this.engine = Optional.of(engine);
+        this.id = id;
+    }
+
+    @Override
+    public Car copy() {
+        // create a new object and return it
+        Car<T> clone = new Car<>(this.name);
+        return clone;
+    }
+}
+```
 ## Add Generics to Traits
 
 By making a trait generic over a type parameter (here `E`), we allow the trait to describe behavior that varies depending on another type — in this case, enabling any vehicle to be built with any compatible engine type `E` while keeping the method signature flexible and reusable across different implementations.
@@ -51,6 +88,13 @@ By making a trait generic over a type parameter (here `E`), we allow the trait t
 // generic build Trait- Engine can be anytype E
 pub trait Build<E> {
     fn build(&mut self, engine: E, id: usize);
+}
+```
+
+```java
+// Generic build interface — any vehicle can be built with any engine type E
+interface Buildable<E> extends GetMetadata, Cloneable {
+    void build(E engine, int id);
 }
 ```
 
@@ -64,6 +108,12 @@ fn show_metadata<T>(t: &T)
     println!("Name - {}, id - {}", t.get_name(), t.get_id());
 
 }
+```
+
+```java
+public static <T extends GetMetadata> void showMetadata(T t) {
+        System.out.println("Name - " + t.getName() + ", id - " + t.getId());
+    }
 ```
 
 ## Add Multiple generic Parameters
@@ -83,6 +133,24 @@ fn create_cars<E, T>(engine: &E, prototype: &T)-> impl Iterator<Item = T>
         vehicle
     })
 }
+```
+```java
+public static <E extends GetMetadata & Copyable<E>, V extends Buildable<E> &  Copyable<V>>
+    Stream<V> createCars(E engine, V prototype) {
+        return Stream.iterate(0, i -> i < 10, i -> i + 1)
+                .map(i -> {
+                    // The method should clone the prototype
+                    // Method should clone the Engine
+                    // There should be Build method in the new prototype which takes in
+                    // new engine
+                    // stream should return the new Car or truck ....
+                    V new_clone = prototype.copy();
+                    E new_engine = engine.copy();
+                    // Build the new protyope
+                    new_clone.build(new_engine, i);
+                    return new_clone;
+                });
+    }
 ```
 
 ## Add impl Trait in Return Position
