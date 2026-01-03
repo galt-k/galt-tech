@@ -301,8 +301,8 @@ public static <T extends GetMetadata & Calibrate & Cloneable> void applyCalibrat
 }
 ```
 
-# Discussing the Tradeoffs
-## Monomorphisation vs Type Erasure
+## Discussing the Tradeoffs
+### Monomorphisation vs Type Erasure
 **Rust (Monomorphization)**: The compiler generates a unique, concrete copy of a function for every type it encounters. It’s Specialization.
 
 * **<span style="color: #c62828;">Cost:</span>** Larger binaries ("Binary Bloat") and longer compile times.
@@ -315,7 +315,7 @@ public static <T extends GetMetadata & Calibrate & Cloneable> void applyCalibrat
 
 * **<span style="color: #2e7d32;">Gain:</span>** One small function handles everything, keeping the executable lean.
 
-## Static vs Dynamic Dispatch 
+### Static vs Dynamic Dispatch 
 **Static (Rust)**: Binding occurs at compile time. The compiler maps the call to a specific memory address, enabling Inlining (merging the algorithm directly into the caller).
 
 * **<span style="color: #c62828;">Cost:</span>** Rigidity. You cannot change the behavior of the Car at runtime. To change how a "Worker" processes an "Engine," the entire application must be recompiled.
