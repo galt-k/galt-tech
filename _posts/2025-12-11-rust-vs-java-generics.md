@@ -41,63 +41,55 @@ The foundation of our system is a `Car` struct that can hold any type of engine,
 By making `Car` generic over `T`, we allow the same vehicle struct to work with different engine representations without duplicating code.
 
 **Rust**
-```diff
-pub trait GetMetadata {
-    fn get_name(&self) -> String;
-    fn get_id(&self) -> i32;
+<pre style="background: #fdfdfd; color: #24292e; padding: 20px; border-radius: 8px; font-family: 'Fira Code', monospace; line-height: 1.6; border: 2px solid #eee; overflow-x: auto;">
+<code><span style="color: #d73a49;">pub trait</span> <span style="color: #6f42c1;">GetMetadata</span> {
+    <span style="color: #d73a49;">fn</span> <span style="color: #005cc5;">get_name</span>(&<span style="color: #d73a49;">self</span>) -> <span style="color: #6f42c1;">String</span>;
+    <span style="color: #d73a49;">fn</span> <span style="color: #005cc5;">get_id</span>(&<span style="color: #d73a49;">self</span>) -> <span style="color: #005cc5;">i32</span>;
 }
 
-#[derive(Debug, Clone)]
-+ pub struct Car<T>
-+ where
-+    T: GetMetadata,
+<span style="color: #6a737d;">#[derive(Debug, Clone)]</span>
+<span style="color: #d73a49;">pub struct</span> <span style="color: #6f42c1;">Car</span>&lt;<mark style="background: #ffff00; color: #000; padding: 1px 4px; border: 1px solid #d4d400; border-radius: 3px; font-weight: 900;">T</mark>&gt;
+<span style="color: #d73a49;">where</span>
+    <mark style="background: #ff5722; color: #fff; padding: 3px 6px; border-radius: 4px; font-weight: bold; box-shadow: 2px 2px 0px #bf360c;">T: GetMetadata</mark>,
 {
-    id: i32,
-    engine: Option<T>,
-    name: String,
-}
-```
+    id: <span style="color: #005cc5;">i32</span>,
+    engine: <span style="color: #6f42c1;">Option</span>&lt;<mark style="background: #ffff00; color: #000; padding: 1px 4px; border: 1px solid #d4d400; border-radius: 3px; font-weight: 900;">T</mark>&gt;,
+    name: <span style="color: #6f42c1;">String</span>,
+}</code></pre>
+
 The where T: GetMetadata bound ensures that whatever engine type we use must be able to provide a name and ID — enforcing consistency at compile time while keeping the struct flexible.
 
 **Java**
-```java
-class Car<T extends GetMetadata> implements GetMetadata, Buildable<T>, Copyable<Car<T>> {
-    private int id;
-    private Optional<T> engine;
-    private final String name;
 
-    // Constructor: Initialize with the name, leave others for the build step
-    public Car(String name) {
-        this.name = name;
-        this.engine = Optional.empty();
-        this.id = 0;
+<pre style="background: #fdfdfd; color: #24292e; padding: 20px; border-radius: 8px; font-family: 'Fira Code', monospace; line-height: 1.6; border: 2px solid #eee; overflow-x: auto;">
+<code><span style="color: #d73a49;">class</span> <span style="color: #6f42c1;">Car</span>&lt;<mark style="background: #ff5722; color: #fff; padding: 3px 6px; border-radius: 4px; font-weight: bold; box-shadow: 2px 2px 0px #bf360c;">T extends GetMetadata</mark>&gt; <span style="color: #d73a49;">implements</span> <span style="color: #6f42c1;">GetMetadata</span>, <span style="color: #6f42c1;">Buildable</span>&lt;<mark style="background: #ffff00; color: #000; padding: 1px 4px; border: 1px solid #d4d400; border-radius: 3px; font-weight: 900;">T</mark>&gt;, <span style="color: #6f42c1;">Copyable</span>&lt;<span style="color: #6f42c1;">Car</span>&lt;<mark style="background: #ffff00; color: #000; padding: 1px 4px; border: 1px solid #d4d400; border-radius: 3px; font-weight: 900;">T</mark>&gt;&gt; {
+    <span style="color: #d73a49;">private int</span> id;
+    <span style="color: #d73a49;">private</span> <span style="color: #6f42c1;">Optional</span>&lt;<mark style="background: #ffff00; color: #000; padding: 1px 4px; border: 1px solid #d4d400; border-radius: 3px; font-weight: 900;">T</mark>&gt; engine;
+    <span style="color: #d73a49;">private final</span> <span style="color: #6f42c1;">String</span> name;
+
+    <span style="color: #6a737d;">// Constructor</span>
+    <span style="color: #d73a49;">public</span> <span style="color: #005cc5;">Car</span>(<span style="color: #6f42c1;">String</span> name) {
+        <span style="color: #d73a49;">this</span>.name = name;
+        <span style="color: #d73a49;">this</span>.engine = <span style="color: #6f42c1;">Optional</span>.<span style="color: #005cc5;">empty</span>();
+        <span style="color: #d73a49;">this</span>.id = <span style="color: #b5cea8;">0</span>;
     }
 
-    @Override
-    public String getName() {
-        return this.name;
+    <span style="color: #6a737d;">@Override</span>
+    <span style="color: #d73a49;">public</span> <span style="color: #6f42c1;">String</span> <span style="color: #005cc5;">getName</span>() { <span style="color: #d73a49;">return this</span>.name; }
+
+    <span style="color: #6a737d;">@Override</span>
+    <span style="color: #d73a49;">public void</span> <span style="color: #005cc5;">build</span>(<mark style="background: #ffff00; color: #000; padding: 1px 4px; border: 1px solid #d4d400; border-radius: 3px; font-weight: 900;">T</mark> engine, <span style="color: #d73a49;">int</span> id) {
+        <span style="color: #d73a49;">this</span>.engine = <span style="color: #6f42c1;">Optional</span>.<span style="color: #005cc5;">of</span>(engine);
+        <span style="color: #d73a49;">this</span>.id = id;
     }
 
-    @Override
-    public int getId() {
-        return this.id;
+    <span style="color: #6a737d;">@Override</span>
+    <span style="color: #d73a49;">public</span> <span style="color: #6f42c1;">Car</span> <span style="color: #005cc5;">copy</span>() {
+        <span style="color: #6f42c1;">Car</span>&lt;<mark style="background: #ffff00; color: #000; padding: 1px 4px; border: 1px solid #d4d400; border-radius: 3px; font-weight: 900;">T</mark>&gt; clone = <span style="color: #d73a49;">new</span> <span style="color: #6f42c1;">Car</span>&lt;&gt;(<span style="color: #d73a49;">this</span>.name);
+        <span style="color: #d73a49;">return</span> clone;
     }
+}</code></pre>
 
-    @Override
-    public void build(T engine, int id) {
-        // Now this is legal because fields are not final
-        this.engine = Optional.of(engine);
-        this.id = id;
-    }
-
-    @Override
-    public Car copy() {
-        // create a new object and return it
-        Car<T> clone = new Car<>(this.name);
-        return clone;
-    }
-}
-```
 Java uses T extends GetMetadata to achieve the same constraint.
 
 **Important note:** Rust has zero inheritance — there is no concept of base classes or subclasses at all. Behavior is shared exclusively through traits, and data through composition (embedding structs). This is not a "preference" for composition over inheritance; inheritance simply does not exist in Rust, eliminating an entire class of design complexities and runtime overhead.
@@ -106,37 +98,55 @@ Java uses T extends GetMetadata to achieve the same constraint.
 By making a trait generic over a type parameter (here `E`), we allow the trait to describe behavior that varies depending on another type — in this case, enabling any vehicle to be built with any compatible engine type `E` while keeping the method signature flexible and reusable across different implementations.
 
 **Rust**
-```rust
-// generic build Trait- Engine can be anytype E
-pub trait Build<E> {
-    fn build(&mut self, engine: E, id: usize);
-}
-```
+<pre style="background: #fdfdfd; color: #24292e; padding: 20px; border-radius: 8px; font-family: 'Fira Code', monospace; line-height: 1.6; border: 2px solid #eee; overflow-x: auto;">
+<code><span style="color: #6a737d;">// generic build Trait- Engine can be anytype E</span>
+<span style="color: #d73a49;">pub trait</span> <span style="color: #6f42c1;">Build</span>&lt;<mark style="background: #ff5722; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold; box-shadow: 2px 2px 0px #bf360c;">E</mark>&gt; {
+    <span style="color: #d73a49;">fn</span> <span style="color: #005cc5;">build</span>(&<span style="color: #d73a49;">mut self</span>, engine: <mark style="background: #ffff00; color: #000; padding: 1px 4px; border: 1px solid #d4d400; border-radius: 3px; font-weight: 900;">E</mark>, id: <span style="color: #005cc5;">usize</span>);
+}</code></pre>
+
 **Java**
-```java
-// Generic build interface — any vehicle can be built with any engine type E
-interface Buildable<E> extends GetMetadata, Cloneable {
-    void build(E engine, int id);
-}
-```
+<pre style="background: #fdfdfd; color: #24292e; padding: 20px; border-radius: 8px; font-family: 'Fira Code', monospace; line-height: 1.6; border: 2px solid #eee; overflow-x: auto;">
+<code><span style="color: #6a737d;">// Generic build interface — any vehicle can be built with any engine type E</span>
+<span style="color: #d73a49;">interface</span> <span style="color: #6f42c1;">Buildable</span>&lt;<mark style="background: #ff5722; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold; box-shadow: 2px 2px 0px #bf360c;">E</mark>&gt; <span style="color: #d73a49;">extends</span> <span style="color: #6f42c1;">GetMetadata</span>, <span style="color: #6f42c1;">Cloneable</span> {
+    <span style="color: #d73a49;">void</span> <span style="color: #005cc5;">build</span>(<mark style="background: #ffff00; color: #000; padding: 1px 4px; border: 1px solid #d4d400; border-radius: 3px; font-weight: 900;">E</mark> engine, <span style="color: #d73a49;">int</span> id);
+}</code></pre>
+
+**Important note:** Rust’s `<E>` triggers Monomorphization (unique machine code per type), whereas Java’s `<E>` relies on Type Erasure (a single generic method with runtime overhead). 
 
 ### Add Generics to Methods
 By adding a generic type parameter T with a trait bound (where T: GetMetadata), the show_metadata function becomes reusable for any type that implements the GetMetadata trait, allowing it to call get_name() and get_id() without knowing the concrete type upfront.
 
-```rust
-fn show_metadata<T>(t: &T) 
-    where T: GetMetadata {
-    // call the metadat behavior
-    println!("Name - {}, id - {}", t.get_name(), t.get_id());
+**Rust**
+<pre style="background: #fdfdfd; color: #24292e; padding: 20px; border-radius: 8px; font-family: 'Fira Code', monospace; line-height: 1.6; border: 2px solid #eee; overflow-x: auto;">
+<code><span style="color: #d73a49;">fn</span> <span style="color: #005cc5;">show_metadata</span>&lt;<mark style="background: #ffff00; color: #000; padding: 1px 4px; border: 1px solid #d4d400; border-radius: 3px; font-weight: 900;">T</mark>&gt;(t: &<mark style="background: #ffff00; color: #000; padding: 1px 4px; border: 1px solid #d4d400; border-radius: 3px; font-weight: 900;">T</mark>) 
+    <span style="color: #d73a49;">where</span> <mark style="background: #ff5722; color: #fff; padding: 3px 6px; border-radius: 4px; font-weight: bold; box-shadow: 2px 2px 0px #bf360c;">T: GetMetadata</mark> {
+    
+    <span style="color: #6a737d;">// call the metadata behavior</span>
+    <span style="color: #005cc5;">println!</span>(<span style="color: #032f62;">"Name - {}, id - {}"</span>, t.<span style="color: #005cc5;">get_name</span>(), t.<span style="color: #005cc5;">get_id</span>());
+}</code></pre>
 
-}
-```
+**Java**
+<pre style="background: #fdfdfd; color: #24292e; padding: 20px; border-radius: 8px; font-family: 'Fira Code', monospace; line-height: 1.6; border: 2px solid #eee; overflow-x: auto;">
+<code><span style="color: #d73a49;">public static</span> &lt;<mark style="background: #ff5722; color: #fff; padding: 3px 6px; border-radius: 4px; font-weight: bold; box-shadow: 2px 2px 0px #bf360c;">T extends GetMetadata</mark>&gt; <span style="color: #d73a49;">void</span> <span style="color: #005cc5;">showMetadata</span>(<mark style="background: #ffff00; color: #000; padding: 1px 4px; border: 1px solid #d4d400; border-radius: 3px; font-weight: 900;">T</mark> t) {
+    <span style="color: #6f42c1;">System</span>.<span style="color: #005cc5;">out</span>.<span style="color: #005cc5;">println</span>(<span style="color: #032f62;">"Name - "</span> + t.<span style="color: #005cc5;">getName</span>() + <span style="color: #032f62;">", id - "</span> + t.<span style="color: #005cc5;">getId</span>());
+}</code></pre>
 
-```java
-public static <T extends GetMetadata> void showMetadata(T t) {
-        System.out.println("Name - " + t.getName() + ", id - " + t.getId());
-    }
-```
+While the code looks identical, the compiler's output reveals the true architectural difference:
+
+**Important note:**
+
+**Rust (Monomorphization):** If you call show_metadata for ElectricEngine and GasEngine, Rust generates two separate copies of the function in your binary.
+
+* **<span style="color: #2e7d32;">Gain:</span>** The CPU executes a direct jump (no searching).
+
+* **<span style="color: #c62828;">Cost:</span>** Larger executable size ("Binary Bloat").
+
+**Java (Type Erasure):** No matter how many types of engines you have, Java keeps only one copy of showMetadata.
+
+* **<span style="color: #2e7d32;">Gain:</span>**  Very small, compact binaries.
+
+* **<span style="color: #c62828;">Cost:</span>** Every call incurs a V-Table lookup, forcing the CPU to pause and "find" the correct method at runtime.
+
 
 ### Add Multiple generic Parameters
 We introduce two generic parameters (E for engine, T for vehicle) and use trait bounds to ensure compatibility — allowing the factory to work with any engine and any vehicle type that supports building with that engine.
