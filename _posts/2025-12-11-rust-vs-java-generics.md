@@ -14,6 +14,10 @@ toc: true  # Enables TOC for this post
 toc_sticky: true
 ---
 
+<div class="notice--info">
+  <strong>Engineering Summary:</strong> When evaluating <strong>Rust vs Java generics</strong>, the fundamental difference lies in how the compilers handle abstraction: Rust utilizes <strong>monomorphization</strong> for zero-cost performance, while Java relies on <strong>type erasure</strong>, which introduces a persistent runtime cost. This audit explores the memory layout, binary implications, and execution speed of both approaches.
+</div>
+
 ## Introduction
 This article provides a critical evaluation of the **generics** feature in Rust and Java. The goal is not to declare one language is superior over other, but to examine this specific feature objectively, highlighting the strengths and limitations in each lanugage. 
 
