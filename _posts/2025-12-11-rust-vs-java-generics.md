@@ -118,8 +118,8 @@ By making a trait generic over a type parameter (here `E`), we allow the trait t
 
 **Java**
 <pre style="background: #fdfdfd; color: #24292e; padding: 20px; border-radius: 8px; font-family: 'Fira Code', monospace; line-height: 1.6; border: 2px solid #eee; overflow-x: auto;">
-<code><span style="color: #6a737d;">// Generic build interface — any vehicle can be built with any engine type E</span>
-<span style="color: #d73a49;">interface</span> <span style="color: #6f42c1;">Buildable</span>&lt;<mark style="background: #ff5722; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold; box-shadow: 2px 2px 0px #bf360c;">E</mark>&gt; <span style="color: #d73a49;">extends</span> <span style="color: #6f42c1;">GetMetadata</span>, <span style="color: #6f42c1;">Cloneable</span> {
+<code><span style="color: #6a737d;">// Generic build interface — separated from Metadata to allow flat composition</span>
+<span style="color: #d73a49;">interface</span> <span style="color: #6f42c1;">Buildable</span>&lt;<mark style="background: #ff5722; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold; box-shadow: 2px 2px 0px #bf360c;">E</mark>&gt; {
     <span style="color: #d73a49;">void</span> <span style="color: #005cc5;">build</span>(<mark style="background: #ffff00; color: #000; padding: 1px 4px; border: 1px solid #d4d400; border-radius: 3px; font-weight: 900;">E</mark> engine, <span style="color: #d73a49;">int</span> id);
 }</code></pre>
 
@@ -163,144 +163,158 @@ While the code looks identical, the compiler's output reveals the true architect
 ### Add Multiple generic Parameters
 We introduce two generic parameters (E for engine, T for vehicle) and use trait bounds to ensure compatibility — allowing the factory to work with any engine and any vehicle type that supports building with that engine.
 
-```rust 
-fn create_cars<E, T>(engine: &E, prototype: &T)-> impl Iterator<Item = T>
-    where E: Clone + GetMetadata,
-          T: Clone + Build<E> + GetMetadata
+**Rust**
+<pre style="background: #fdfdfd; color: #24292e; padding: 20px; border-radius: 8px; font-family: 'Fira Code', monospace; line-height: 1.6; border: 2px solid #eee; overflow-x: auto;">
+<code><span style="color: #6a737d;">// Factory function using ad-hoc composition (Trait Bounds)</span>
+<span style="color: #d73a49;">fn</span> <span style="color: #005cc5;">create_cars</span>&lt;<span style="color: #6f42c1;">E</span>, <span style="color: #6f42c1;">T</span>&gt;(engine: &amp;<mark style="background: #ff5722; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold; box-shadow: 2px 2px 0px #bf360c;">E</mark>, prototype: &amp;<mark style="background: #ffff00; color: #000; padding: 1px 4px; border: 1px solid #d4d400; border-radius: 3px; font-weight: 900;">T</mark>) -&gt; <span style="color: #d73a49;">impl</span> <span style="color: #6f42c1;">Iterator</span>&lt;Item = <span style="color: #6f42c1;">T</span>&gt;
+    <span style="color: #d73a49;">where</span> <mark style="background: #ff5722; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold; box-shadow: 2px 2px 0px #bf360c;">E</mark>: <span style="color: #6f42c1;">Clone</span> + <span style="color: #6f42c1;">GetMetadata</span>,
+          <mark style="background: #ffff00; color: #000; padding: 1px 4px; border: 1px solid #d4d400; border-radius: 3px; font-weight: 900;">T</mark>: <span style="color: #6f42c1;">Clone</span> + <span style="color: #6f42c1;">Build</span>&lt;<span style="color: #6f42c1;">E</span>&gt; + <span style="color: #6f42c1;">GetMetadata</span>
 {
-    // Clone the Engine 10 times
-    // clone the Vehicle 10 times
-    (0..10).map(move |i| {
-        let mut vehicle = prototype.clone();
-        let new_engine = engine.clone(); 
-        vehicle.build(new_engine, i);
+    (<span style="color: #005cc5;">0</span>..<span style="color: #005cc5;">10</span>).<span style="color: #005cc5;">map</span>(<span style="color: #d73a49;">move</span> |i| {
+        <span style="color: #d73a49;">let mut</span> vehicle = prototype.<span style="color: #005cc5;">clone</span>();
+        <span style="color: #d73a49;">let</span> new_engine = engine.<span style="color: #005cc5;">clone</span>(); 
+        vehicle.<span style="color: #005cc5;">build</span>(new_engine, i);
         vehicle
     })
-}
-```
-```java
-public static <E extends GetMetadata & Copyable<E>, V extends Buildable<E> &  Copyable<V>>
-    Stream<V> createCars(E engine, V prototype) {
-        return Stream.iterate(0, i -> i < 10, i -> i + 1)
-                .map(i -> {
-                    // The method should clone the prototype
-                    // Method should clone the Engine
-                    // There should be Build method in the new prototype which takes in
-                    // new engine
-                    // stream should return the new Car or truck ....
-                    V new_clone = prototype.copy();
-                    E new_engine = engine.copy();
-                    // Build the new protyope
-                    new_clone.build(new_engine, i);
-                    return new_clone;
-                });
-    }
-```
+}</code></pre>
+
+**Java**
+<pre style="background: #fdfdfd; color: #24292e; padding: 20px; border-radius: 8px; font-family: 'Fira Code', monospace; line-height: 1.6; border: 2px solid #eee; overflow-x: auto;">
+<code><span style="color: #6a737d;">// Factory method using Java Intersection Types to mimic Trait Bounds</span>
+<span style="color: #d73a49;">public static</span> &lt;<mark style="background: #ff5722; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold; box-shadow: 2px 2px 0px #bf360c;">E</mark> <span style="color: #d73a49;">extends</span> <span style="color: #6f42c1;">GetMetadata</span> &amp; <span style="color: #6f42c1;">Copyable</span>&lt;<span style="color: #6f42c1;">E</span>&gt;, 
+              <mark style="background: #ffff00; color: #000; padding: 1px 4px; border: 1px solid #d4d400; border-radius: 3px; font-weight: 900;">V</mark> <span style="color: #d73a49;">extends</span> <span style="color: #6f42c1;">GetMetadata</span> &amp; <span style="color: #6f42c1;">Buildable</span>&lt;<span style="color: #6f42c1;">E</span>&gt; &amp; <span style="color: #6f42c1;">Copyable</span>&lt;<span style="color: #6f42c1;">V</span>&gt;&gt;
+<span style="color: #6f42c1;">Stream</span>&lt;<span style="color: #6f42c1;">V</span>&gt; <span style="color: #005cc5;">createCars</span>(<mark style="background: #ff5722; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold; box-shadow: 2px 2px 0px #bf360c;">E</mark> engine, <mark style="background: #ffff00; color: #000; padding: 1px 4px; border: 1px solid #d4d400; border-radius: 3px; font-weight: 900;">V</mark> prototype) {
+    <span style="color: #d73a49;">return</span> <span style="color: #6f42c1;">Stream</span>.<span style="color: #005cc5;">iterate</span>(<span style="color: #005cc5;">0</span>, i -&gt; i &lt; <span style="color: #005cc5;">10</span>, i -&gt; i + <span style="color: #005cc5;">1</span>)
+            .<span style="color: #005cc5;">map</span>(i -&gt; {
+                <span style="color: #6f42c1;">V</span> new_clone = prototype.<span style="color: #005cc5;">copy</span>();
+                <span style="color: #6f42c1;">E</span> new_engine = engine.<span style="color: #005cc5;">copy</span>();
+                new_clone.<span style="color: #005cc5;">build</span>(new_engine, i);
+                <span style="color: #d73a49;">return</span> new_clone;
+            });
+}</code></pre>
 
 ### Add impl Trait in Return Position
 By returning impl Iterator<Item = T>, we hide the concrete iterator type (in this case, a Map from std::ops::Range) while guaranteeing it yields values of type T — providing flexibility without exposing implementation details.
 
-```rust
-fn create_cars<E, T>(engine: &E, prototype: &T)-> impl Iterator<Item = T>
-    where E: Clone + GetMetadata,
-          T: Clone + Build<E> + GetMetadata
+**Rust**
+<pre style="background: #fdfdfd; color: #24292e; padding: 20px; border-radius: 8px; font-family: 'Fira Code', monospace; line-height: 1.6; border: 2px solid #eee; overflow-x: auto;">
+<code><span style="color: #6a737d;">// Rust: Static dispatch via Opaque Return Types</span>
+<span style="color: #d73a49;">fn</span> <span style="color: #005cc5;">create_cars</span>&lt;<span style="color: #6f42c1;">E</span>, <span style="color: #6f42c1;">T</span>&gt;(engine: &amp;<span style="color: #6f42c1;">E</span>, prototype: &amp;<span style="color: #6f42c1;">T</span>) -&gt; <mark style="background: #00bcd4; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold; box-shadow: 2px 2px 0px #0097a7;">impl Iterator&lt;Item = T&gt;</mark>
+    <span style="color: #d73a49;">where</span> <span style="color: #6f42c1;">E</span>: <span style="color: #6f42c1;">Clone</span> + <span style="color: #6f42c1;">GetMetadata</span>,
+          <span style="color: #6f42c1;">T</span>: <span style="color: #6f42c1;">Clone</span> + <span style="color: #6f42c1;">Build</span>&lt;<span style="color: #6f42c1;">E</span>&gt; + <span style="color: #6f42c1;">GetMetadata</span>
 {
-    // Clone the Engine 10 times
-    // clone the Vehicle 10 times
-    (0..10).map(move |i| {
-        let mut vehicle = prototype.clone();
-        let new_engine = engine.clone(); 
-        vehicle.build(new_engine, i);
+    (<span style="color: #005cc5;">0</span>..<span style="color: #005cc5;">10</span>).<span style="color: #005cc5;">map</span>(<span style="color: #d73a49;">move</span> |i| {
+        <span style="color: #d73a49;">let mut</span> vehicle = prototype.<span style="color: #005cc5;">clone</span>();
+        <span style="color: #d73a49;">let</span> new_engine = engine.<span style="color: #005cc5;">clone</span>(); 
+        vehicle.<span style="color: #005cc5;">build</span>(new_engine, i);
         vehicle
     })
-}
+}</code></pre>
+
+**Java**
+<pre style="background: #fdfdfd; color: #24292e; padding: 20px; border-radius: 8px; font-family: 'Fira Code', monospace; line-height: 1.6; border: 2px solid #eee; overflow-x: auto;">
+<code><span style="color: #6a737d;">// Java: Dynamic dispatch via Interface Return Type</span>
+<span style="color: #d73a49;">public static</span> &lt;<span style="color: #6f42c1;">E</span> <span style="color: #d73a49;">extends</span> <span style="color: #6f42c1;">GetMetadata</span> &amp; <span style="color: #6f42c1;">Copyable</span>&lt;<span style="color: #6f42c1;">E</span>&gt;, 
+              <span style="color: #6f42c1;">V</span> <span style="color: #d73a49;">extends</span> <span style="color: #6f42c1;">GetMetadata</span> &amp; <span style="color: #6f42c1;">Buildable</span>&lt;<span style="color: #6f42c1;">E</span>&gt; &amp; <span style="color: #6f42c1;">Copyable</span>&lt;<span style="color: #6f42c1;">V</span>&gt;&gt;
+<mark style="background: #00bcd4; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold; box-shadow: 2px 2px 0px #0097a7;">Stream&lt;V&gt;</mark> <span style="color: #005cc5;">createCars</span>(<span style="color: #6f42c1;">E</span> engine, <span style="color: #6f42c1;">V</span> prototype) {
+    <span style="color: #d73a49;">return</span> <span style="color: #6f42c1;">Stream</span>.<span style="color: #005cc5;">iterate</span>(<span style="color: #005cc5;">0</span>, i -&gt; i &lt; <span style="color: #005cc5;">10</span>, i -&gt; i + <span style="color: #005cc5;">1</span>)
+            .<span style="color: #005cc5;">map</span>(i -&gt; {
+                <span style="color: #6f42c1;">V</span> new_clone = prototype.<span style="color: #005cc5;">copy</span>();
+                <span style="color: #6f42c1;">E</span> new_engine = engine.<span style="color: #005cc5;">copy</span>();
+                new_clone.<span style="color: #005cc5;">build</span>(new_engine, i);
+                <span style="color: #d73a49;">return</span> new_clone;
+            });
+}</code></pre>
+
+**Important Note**: 
+* Rust allows you to return an "anonymous" type that satisfies multiple unrelated requirements at once using the + syntax.
+```rust
+fn create_factory() -> impl Iterator<Item = Car> + Send + Sync { ... }
 ```
+* Java's return position is **Nominal** and **Rigid**. You can only return one specific class or interface.
+You cannot return an intersection like Stream<V> & Serializable, if you need a workaround you might have to do something like this 
+
+```java
+interface SerializableStream<V> extends Stream<V>, Serializable {}
+```
+
+This creates **Interface Bloat**. You are adding more metadata to the JVM's memory and adding another layer to the V-Table lookup (ITABLE) just to satisfy a type requirement.
+
 ### Add Lifetimes to Generics
 
 By combining generic type parameters with lifetime parameters, we can create functions and structs that work with any type while safely borrowing data from existing objects. In the create_car_views function, the generic T allows any engine type, while the lifetime 'a ties the returned borrowed CarView<'a> structs to the input slice — enabling zero-allocation iteration over vehicles with references that the compiler guarantees remain valid for the entire lifetime of the view.
 
-```rust
-// A lighweight view into a car
-// Borrows data
-pub struct CarView<'a> {
-    pub id: i32,
-    pub name: &'a str,
-    pub engine_name: &'a str,
-}
-
-//Factory that returns borrowed views
-fn create_car_views<'a, T>(
-    cars: &'a [Car<T>],
-) -> impl Iterator<Item = CarView<'a>> + 'a
-where 
-    T: GetMetadata,
+**Rust**
+<pre style="background: #fdfdfd; color: #24292e; padding: 20px; border-radius: 8px; font-family: 'Fira Code', monospace; line-height: 1.6; border: 2px solid #eee; overflow-x: auto;">
+<code><span style="color: #6a737d;">// Rust: Zero-cost borrowing using Lifetimes</span>
+<span style="color: #d73a49;">fn</span> <span style="color: #005cc5;">create_car_views</span>&lt;<mark style="background: #e1bee7; color: #4a148c; padding: 2px 4px; border-radius: 3px; font-weight: bold;">'a</mark>, <span style="color: #6f42c1;">T</span>&gt;(
+    cars: &amp;<mark style="background: #e1bee7; color: #4a148c; padding: 2px 4px; border-radius: 3px; font-weight: bold;">'a</mark> [<span style="color: #6f42c1;">Car</span>&lt;<span style="color: #6f42c1;">T</span>&gt;],
+) -&gt; <span style="color: #d73a49;">impl</span> <span style="color: #6f42c1;">Iterator</span>&lt;Item = <span style="color: #6f42c1;">CarView</span>&lt;<mark style="background: #e1bee7; color: #4a148c; padding: 2px 4px; border-radius: 3px; font-weight: bold;">'a</mark>&gt;&gt; + <mark style="background: #e1bee7; color: #4a148c; padding: 2px 4px; border-radius: 3px; font-weight: bold;">'a</mark>
+<span style="color: #d73a49;">where</span> 
+    <span style="color: #6f42c1;">T</span>: <span style="color: #6f42c1;">GetMetadata</span>,
 {
-    cars.iter().map(|car| {
-    // Borrow the name directly
-        let name = &car.name;
-
-        // Borrow the engine name — but get_name() returns String, so we can't borrow it directly
-        // Instead, we use a static fallback for "No engine"
-        let engine_name = car.engine
-            .as_ref()
-            .and_then(|e| {
-                // We can't return &str from e.get_name().as_str() because the String is temporary
-                // So we use a static string instead
-                Some(match e.get_id() {
-                    1 => "Gasoline (Petrol) Engine",
-                    2 => "Pure Electric Motor",
-                    3 => "Custom Cylinder Layout",
-                    4 => "Custom Ignition",
-                    _ => "Unknown Engine",
+    cars.<span style="color: #005cc5;">iter</span>().<span style="color: #005cc5;">map</span>(|car| {
+        <span style="color: #d73a49;">let</span> name = &amp;car.name;
+        <span style="color: #d73a49;">let</span> engine_name = car.engine
+            .<span style="color: #005cc5;">as_ref</span>()
+            .<span style="color: #005cc5;">and_then</span>(|e| {
+                <span style="color: #005cc5;">Some</span>(<span style="color: #d73a49;">match</span> e.<span style="color: #005cc5;">get_id</span>() {
+                    <span style="color: #005cc5;">1</span> =&gt; <span style="color: #032f62;">"Gasoline Engine"</span>,
+                    <span style="color: #005cc5;">2</span> =&gt; <span style="color: #032f62;">"Electric Motor"</span>,
+                    _ =&gt; <span style="color: #032f62;">"Unknown"</span>,
                 })
         })
-        .unwrap_or("No engine");
+        .<span style="color: #005cc5;">unwrap_or</span>(<span style="color: #032f62;">"No engine"</span>);
 
-        CarView {
+        <span style="color: #6f42c1;">CarView</span> {
             id: car.id,
             name: name,
             engine_name,
         }
     })
-}
-```
+}</code></pre>
 
 ### Add Concurrency Safety with Send and Sync
 The Send + Sync bounds on T ensure the engine type is safe to share across the threads. 
-```rust
-async fn assemble_car<T>(engine: T) -> ThreadSafeCar<T>
-where
-    T: Send + Sync + GetMetadata + Clone + 'static + Debug,
+
+<pre style="background: #fdfdfd; color: #24292e; padding: 20px; border-radius: 8px; font-family: 'Fira Code', monospace; line-height: 1.6; border: 2px solid #eee; overflow-x: auto;">
+<code><span style="color: #6a737d;">// Rust: Enforcing Thread-Safety at the Type Level</span>
+<span style="color: #d73a49;">async fn</span> <span style="color: #005cc5;">assemble_car</span>&lt;<span style="color: #6f42c1;">T</span>&gt;(engine: <span style="color: #6f42c1;">T</span>) -&gt; <span style="color: #6f42c1;">ThreadSafeCar</span>&lt;<span style="color: #6f42c1;">T</span>&gt;
+<span style="color: #d73a49;">where</span>
+    <span style="color: #6f42c1;">T</span>: <mark style="background: #fff9c4; color: #f57f17; padding: 2px 4px; border-radius: 3px; font-weight: bold;">Send</mark> + <mark style="background: #fff9c4; color: #f57f17; padding: 2px 4px; border-radius: 3px; font-weight: bold;">Sync</mark> + <span style="color: #6f42c1;">GetMetadata</span> + <span style="color: #6f42c1;">Clone</span> + <span style="color: #032f62;">'static</span> + <span style="color: #6f42c1;">Debug</span>,
 {
-    let car = Arc::new(ThreadSafeCar {
-        id: 1,
-        name: "Ford Mustang".to_string(),
-        engine: Mutex::new(None),
-        tyres: Mutex::new(0),
-        seats: Mutex::new(0),
+    <span style="color: #d73a49;">let</span> car = <span style="color: #6f42c1;">Arc</span>::<span style="color: #005cc5;">new</span>(<span style="color: #6f42c1;">ThreadSafeCar</span> {
+        id: <span style="color: #005cc5;">1</span>,
+        name: <span style="color: #032f62;">"Ford Mustang"</span>.<span style="color: #005cc5;">to_string</span>(),
+        engine: <span style="color: #6f42c1;">Mutex</span>::<span style="color: #005cc5;">new</span>(<span style="color: #005cc5;">None</span>),
+        tyres: <span style="color: #6f42c1;">Mutex</span>::<span style="color: #005cc5;">new</span>(<span style="color: #005cc5;">0</span>),
+        seats: <span style="color: #6f42c1;">Mutex</span>::<span style="color: #005cc5;">new</span>(<span style="color: #005cc5;">0</span>),
     });
 
-    let car1 = Arc::clone(&car);
-    let car2 = Arc::clone(&car);
-    let car3 = Arc::clone(&car);
+    <span style="color: #6a737d;">// Cloning the Atomic Reference Counter (Arc) for thread-sharing</span>
+    <span style="color: #d73a49;">let</span> car1 = <span style="color: #6f42c1;">Arc</span>::<span style="color: #005cc5;">clone</span>(&amp;car);
+    <span style="color: #d73a49;">let</span> car2 = <span style="color: #6f42c1;">Arc</span>::<span style="color: #005cc5;">clone</span>(&amp;car);
+    <span style="color: #d73a49;">let</span> car3 = <span style="color: #6f42c1;">Arc</span>::<span style="color: #005cc5;">clone</span>(&amp;car);
 
-    let engine_task = task::spawn(async move {
-        install_engine(car1, engine).await;
+    <span style="color: #d73a49;">let</span> engine_task = task::<span style="color: #005cc5;">spawn</span>(<span style="color: #d73a49;">async move</span> {
+        <span style="color: #005cc5;">install_engine</span>(car1, engine).<span style="color: #d73a49;">await</span>;
     });
 
-    let tyres_task = task::spawn(async move {
-        install_tyres(car2).await;
+    <span style="color: #d73a49;">let</span> tyres_task = task::<span style="color: #005cc5;">spawn</span>(<span style="color: #d73a49;">async move</span> {
+        <span style="color: #005cc5;">install_tyres</span>(car2).<span style="color: #d73a49;">await</span>;
     });
 
-    let seats_task = task::spawn(async move {
-        install_seats(car3).await;
+    <span style="color: #d73a49;">let</span> seats_task = task::<span style="color: #005cc5;">spawn</span>(<span style="color: #d73a49;">async move</span> {
+        <span style="color: #005cc5;">install_seats</span>(car3).<span style="color: #d73a49;">await</span>;
     });
 
-    let _ = tokio::try_join!(engine_task, tyres_task, seats_task);
+    <span style="color: #d73a49;">let</span> _ = tokio::<span style="color: #005cc5;">try_join!</span>(engine_task, tyres_task, seats_task);
 
-    Arc::try_unwrap(car).unwrap()
-}
-```
+    <span style="color: #6f42c1;">Arc</span>::<span style="color: #005cc5;">try_unwrap</span>(car).<span style="color: #005cc5;">unwrap</span>()
+}</code></pre>
+
+**Important note:** In this asynchronous factory, Rust uses Marker Traits **(Send + Sync)** to prove thread-safety at compile-time. Java lacks any mechanism to enforce these constraints via generics, relying instead on runtime discipline and developer documentation.
+
 ### Add Closures to generics
 Rust allows functions to be generic not only over types but also over behavior, by accepting closures as parameters with trait bounds like Fn. This enables powerful, flexible algorithms that work with any callable meeting the required signature.
 
