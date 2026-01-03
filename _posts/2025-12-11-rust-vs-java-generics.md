@@ -29,13 +29,13 @@ This article answers key questions about Rust and Java generics, including:
 
 By the end, you'll understand the strengths and limitations of generics in both languages — with practical examples from a vehicle factory scenario.
 
-# Exploring Generics in Rust & Java: A Practical Journey with a Vehicle Factory
+## Exploring Generics in Rust & Java: A Practical Journey with a Vehicle Factory
 
 This article takes a hands-on approach to understanding generics by building a simple yet flexible vehicle factory. We start with basic concepts and progressively add more advanced generic features, showing how each step improves code reuse, type safety, and expressiveness.
 
 The example revolves around vehicles (primarily cars) that can be equipped with different kinds of engines. Engines are modeled with multiple classifications, and the factory can produce batches of vehicles while supporting various customization and viewing patterns.
 
-## Adding Generics to a Struct vs Class
+### Adding Generics to a Struct vs Class
 The foundation of our system is a `Car` struct that can hold any type of engine, as long as that engine provides metadata.
 
 By making `Car` generic over `T`, we allow the same vehicle struct to work with different engine representations without duplicating code.
@@ -96,7 +96,7 @@ class Car<T extends GetMetadata> implements GetMetadata, Buildable<T>, Copyable<
     }
 }
 ```
-## Add Generics to Traits and Interfaces
+### Add Generics to Traits and Interfaces
 
 By making a trait generic over a type parameter (here `E`), we allow the trait to describe behavior that varies depending on another type — in this case, enabling any vehicle to be built with any compatible engine type `E` while keeping the method signature flexible and reusable across different implementations.
 ```rust
@@ -113,7 +113,7 @@ interface Buildable<E> extends GetMetadata, Cloneable {
 }
 ```
 
-## Add Generics to Methods
+### Add Generics to Methods
 By adding a generic type parameter T with a trait bound (where T: GetMetadata), the show_metadata function becomes reusable for any type that implements the GetMetadata trait, allowing it to call get_name() and get_id() without knowing the concrete type upfront.
 
 ```rust
@@ -131,7 +131,7 @@ public static <T extends GetMetadata> void showMetadata(T t) {
     }
 ```
 
-## Add Multiple generic Parameters
+### Add Multiple generic Parameters
 We introduce two generic parameters (E for engine, T for vehicle) and use trait bounds to ensure compatibility — allowing the factory to work with any engine and any vehicle type that supports building with that engine.
 
 ```rust 
@@ -168,7 +168,7 @@ public static <E extends GetMetadata & Copyable<E>, V extends Buildable<E> &  Co
     }
 ```
 
-## Add impl Trait in Return Position
+### Add impl Trait in Return Position
 By returning impl Iterator<Item = T>, we hide the concrete iterator type (in this case, a Map from std::ops::Range) while guaranteeing it yields values of type T — providing flexibility without exposing implementation details.
 
 ```rust
@@ -186,7 +186,7 @@ fn create_cars<E, T>(engine: &E, prototype: &T)-> impl Iterator<Item = T>
     })
 }
 ```
-## Add Lifetimes to Generics
+### Add Lifetimes to Generics
 
 By combining generic type parameters with lifetime parameters, we can create functions and structs that work with any type while safely borrowing data from existing objects. In the create_car_views function, the generic T allows any engine type, while the lifetime 'a ties the returned borrowed CarView<'a> structs to the input slice — enabling zero-allocation iteration over vehicles with references that the compiler guarantees remain valid for the entire lifetime of the view.
 
@@ -236,7 +236,7 @@ where
 }
 ```
 
-## Add Concurrency Safety with Send and Sync
+### Add Concurrency Safety with Send and Sync
 The Send + Sync bounds on T ensure the engine type is safe to share across the threads. 
 ```rust
 async fn assemble_car<T>(engine: T) -> ThreadSafeCar<T>
@@ -272,7 +272,7 @@ where
     Arc::try_unwrap(car).unwrap()
 }
 ```
-## Add Closures to generics
+### Add Closures to generics
 Rust allows functions to be generic not only over types but also over behavior, by accepting closures as parameters with trait bounds like Fn. This enables powerful, flexible algorithms that work with any callable meeting the required signature.
 
 ```rust
