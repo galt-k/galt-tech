@@ -2,6 +2,7 @@ url: "https://galt-k.github.io"
 baseurl: "/galt-tech"
 breadcrumbs: false 
 
+
 # This gives you clean, professional URLs without the dates
 permalink: /:categories/:title/
 
@@ -25,6 +26,7 @@ plugins:
   - jekyll-remote-theme
   - jekyll-feed
   - jekyll-seo-tag
+  - jekyll-sitemap
   - jekyll-include-cache  # Improves build speed
 
 # Theme skin: "contrast" for bold colors; try "dark" for sci-fi vibe

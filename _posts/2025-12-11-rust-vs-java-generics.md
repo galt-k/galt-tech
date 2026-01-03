@@ -1,9 +1,17 @@
 ---
 layout: single  # Full article layout with sidebar/TOC
-title: "Critical Evaluation: Generics in Rust vs Java"
+title: "Generics in Rust vs Java, A Deep-Dive Performance Audit"
+seo_title: "Rust vs Java Generics: Performance & Memory Audit"
+excerpt: "A deep-dive technical audit comparing Rust's static dispatch with Java's type erasure and V-Table overhead."
+description: "Engineering comparison of Rust monomorphization vs Java type erasure. Covers memory layout, V-Tables, and binary bloat."
 date: 2025-12-11
-tags: [rust, java, generics]
+tags:
+  - Rust
+  - Java
+  - Computer Science
+  - Performance
 toc: true  # Enables TOC for this post
+toc_sticky: true
 ---
 
 ## Introduction
@@ -345,3 +353,17 @@ public static <T extends GetMetadata & Calibrate & Cloneable> void applyCalibrat
 * **<span style="color: #c62828;">Cost:</span>** Indirection. Every call requires a "V-Table Lookup." The CPU must fetch the object's address, find its method table, and jump to a new location. This "pointer chasing" prevents the compiler from optimizing the code flow and often leads to cache misses.
 
 * **<span style="color: #2e7d32;">Gain:</span>** Polymorphic Flexibility. You can load new engine types or different calibration logic (via plugins or dependency injection) while the program is running. This is the foundation of "Modular" architecture.
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": "{{ page.title }}",
+  "description": "{{ page.description }}",
+  "proficiencyLevel": "Expert",
+  "author": {
+    "@type": "Person",
+    "name": "Your Name"
+  }
+}
+</script>
