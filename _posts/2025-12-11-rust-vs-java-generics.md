@@ -19,7 +19,7 @@ The analysis that follows is intended to help developers understand the differen
 
 This article answers key questions about Rust and Java generics, including:
 
-- How do generics work in structs, traits, classes?
+- How do generics work in structs in Rust and classes in Java?
 - What is the difference between `impl Trait` and trait objects?
 - How do lifetimes interact with generics?
 - Why does Rust use `Send + Sync` for concurrency safety?
@@ -40,16 +40,17 @@ The foundation of our system is a `Car` struct that can hold any type of engine,
 
 By making `Car` generic over `T`, we allow the same vehicle struct to work with different engine representations without duplicating code.
 
-```rust
+**Rust**
+```diff
 pub trait GetMetadata {
     fn get_name(&self) -> String;
     fn get_id(&self) -> i32;
 }
 
 #[derive(Debug, Clone)]
-pub struct Car<T>
-where
-    T: GetMetadata,
++ pub struct Car<T>
++ where
++    T: GetMetadata,
 {
     id: i32,
     engine: Option<T>,
@@ -58,6 +59,7 @@ where
 ```
 The where T: GetMetadata bound ensures that whatever engine type we use must be able to provide a name and ID — enforcing consistency at compile time while keeping the struct flexible.
 
+**Java**
 ```java
 class Car<T extends GetMetadata> implements GetMetadata, Buildable<T>, Copyable<Car<T>> {
     private int id;
@@ -96,16 +98,21 @@ class Car<T extends GetMetadata> implements GetMetadata, Buildable<T>, Copyable<
     }
 }
 ```
+Java uses T extends GetMetadata to achieve the same constraint.
+
+**Important note:** Rust has zero inheritance — there is no concept of base classes or subclasses at all. Behavior is shared exclusively through traits, and data through composition (embedding structs). This is not a "preference" for composition over inheritance; inheritance simply does not exist in Rust, eliminating an entire class of design complexities and runtime overhead.
 ### Add Generics to Traits and Interfaces
 
 By making a trait generic over a type parameter (here `E`), we allow the trait to describe behavior that varies depending on another type — in this case, enabling any vehicle to be built with any compatible engine type `E` while keeping the method signature flexible and reusable across different implementations.
+
+**Rust**
 ```rust
 // generic build Trait- Engine can be anytype E
 pub trait Build<E> {
     fn build(&mut self, engine: E, id: usize);
 }
 ```
-
+**Java**
 ```java
 // Generic build interface — any vehicle can be built with any engine type E
 interface Buildable<E> extends GetMetadata, Cloneable {
