@@ -7,17 +7,31 @@ toc: true  # Enables TOC for this post
 ---
 
 ## Introduction
-This article provides a critical evaluation of the **generics** feature in Rust and Java. The goal is not to declare one language is superior over other, but to examine this specific mechanism objectively, highlighting the strengths and limitations in each lanugage. 
+This article provides a critical evaluation of the **generics** feature in Rust and Java. The goal is not to declare one language is superior over other, but to examine this specific feature objectively, highlighting the strengths and limitations in each lanugage. 
 
-A balanced engineering perspective requires acknowledging what each implementation does well while candidly address the shortcomings.
+A balanced engineering perspective requires acknowledging what each implementation does well while clearly address the shortcomings.
 
  Generics are a fundamental tool for writing reusable, type-safe code, yet Rust and Java take different approaches refelcting their distinct design philosiphies and tradeoffs. 
 
 The analysis that follows is intended to help developers understand the differences and make an educated choice when working with either langugae in contexts where generics play a key role.
 
-# Exploring Rust Generics: A Practical Journey with a Vehicle Factory
+## Questions This Article Answers
 
-This article takes a hands-on approach to understanding Rust's generics by building a simple yet flexible vehicle factory. We start with basic concepts and progressively add more advanced generic features, showing how each step improves code reuse, type safety, and expressiveness.
+This article answers key questions about Rust and Java generics, including:
+
+- How do generics work in structs, traits, classes?
+- What is the difference between `impl Trait` and trait objects?
+- How do lifetimes interact with generics?
+- Why does Rust use `Send + Sync` for concurrency safety?
+- How do blanket implementations work in Rust vs Java?
+- Can you return generic iterators or futures safely?
+- What are the trade-offs between Rust's zero-cost abstractions and Java's type erasure?
+
+By the end, you'll understand the strengths and limitations of generics in both languages — with practical examples from a vehicle factory scenario.
+
+# Exploring Generics in Rust & Java: A Practical Journey with a Vehicle Factory
+
+This article takes a hands-on approach to understanding generics by building a simple yet flexible vehicle factory. We start with basic concepts and progressively add more advanced generic features, showing how each step improves code reuse, type safety, and expressiveness.
 
 The example revolves around vehicles (primarily cars) that can be equipped with different kinds of engines. Engines are modeled with multiple classifications, and the factory can produce batches of vehicles while supporting various customization and viewing patterns.
 
@@ -43,6 +57,7 @@ where
 }
 ```
 The where T: GetMetadata bound ensures that whatever engine type we use must be able to provide a name and ID — enforcing consistency at compile time while keeping the struct flexible.
+
 ```java
 class Car<T extends GetMetadata> implements GetMetadata, Buildable<T>, Copyable<Car<T>> {
     private int id;
@@ -81,7 +96,7 @@ class Car<T extends GetMetadata> implements GetMetadata, Buildable<T>, Copyable<
     }
 }
 ```
-## Add Generics to Traits
+## Add Generics to Traits and Interfaces
 
 By making a trait generic over a type parameter (here `E`), we allow the trait to describe behavior that varies depending on another type — in this case, enabling any vehicle to be built with any compatible engine type `E` while keeping the method signature flexible and reusable across different implementations.
 ```rust
@@ -285,3 +300,31 @@ public static <T extends GetMetadata & Calibrate & Cloneable> void applyCalibrat
     vehicle.setCalibration(new_calibration);
 }
 ```
+
+# Discussing the Tradeoffs
+## Monomorphisation vs Type Erasure
+**Rust (Monomorphization)**: The compiler generates a unique, concrete copy of a function for every type it encounters. It’s Specialization.
+
+* **<span style="color: #c62828;">Cost:</span>** Larger binaries ("Binary Bloat") and longer compile times.
+
+* **<span style="color: #2e7d32;">Gain:</span>** Total type-info at runtime; the CPU executes optimized, direct logic.
+
+**Java (Type Erasure)**: The compiler strips generic types after checking them, replacing them with a raw "Object" or "Bound." It’s Generalization.
+
+* **<span style="color: #c62828;">Cost:</span>** Loss of type info at runtime; requires hidden "casts" and metadata checks.
+
+* **<span style="color: #2e7d32;">Gain:</span>** One small function handles everything, keeping the executable lean.
+
+## Static vs Dynamic Dispatch 
+**Static (Rust)**: Binding occurs at compile time. The compiler maps the call to a specific memory address, enabling Inlining (merging the algorithm directly into the caller).
+
+* **<span style="color: #c62828;">Cost:</span>** Rigidity. You cannot change the behavior of the Car at runtime. To change how a "Worker" processes an "Engine," the entire application must be recompiled.
+
+* **<span style="color: #2e7d32;">Gain:</span>** Inlining. The compiler can merge the generic logic directly into the calling function. This eliminates the "jump" to a different memory address, keeping the CPU instruction pipeline full and fast.
+
+
+**Dynamic (Java)**: Binding is deferred until runtime. Java uses V-Tables (Virtual Tables) to resolve which method to call based on the object's actual class at that exact millisecond.
+
+* **<span style="color: #c62828;">Cost:</span>** Indirection. Every call requires a "V-Table Lookup." The CPU must fetch the object's address, find its method table, and jump to a new location. This "pointer chasing" prevents the compiler from optimizing the code flow and often leads to cache misses.
+
+* **<span style="color: #2e7d32;">Gain:</span>** Polymorphic Flexibility. You can load new engine types or different calibration logic (via plugins or dependency injection) while the program is running. This is the foundation of "Modular" architecture.

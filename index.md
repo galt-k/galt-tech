@@ -5,7 +5,7 @@ sidebar:
   nav: false
 ---
 
-# Welcome to Galt's Gulch Code
+# Welcome to Galt's Tech
 
 Critical, no-compromise explorations of Rust, Java, and systems programming.
 
