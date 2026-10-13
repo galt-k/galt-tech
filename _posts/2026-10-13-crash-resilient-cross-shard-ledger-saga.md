@@ -67,41 +67,44 @@ Every transaction is balanced locally ($Debits = Credits$), while the inter-shar
 
 ### Execution Flow & Money Movement
 
-The following left-to-right flow illustrates the bifurcation between the same-shard fast path and the durable cross-shard saga pipeline:
+The following diagram illustrates the routing and money movement across shard boundaries:
 
-```mermaid
-flowchart LR
-    %% Intake (Left)
-    REQ["Transfer Request<br/><i>(idempotency key)</i>"]
-    RESOLVE["Resolve Shard<br/>Placement"]
-    BRANCH{"Same<br/>Shard?"}
+<div class="mermaid-wrapper">
+<pre class="mermaid">
+flowchart TD
+    %% Intake
+    REQ["Transfer Request (Idempotency Key)"]
+    RESOLVE["Resolve Shard Placement"]
+    BRANCH{"Same Shard?"}
 
     REQ --> RESOLVE
     RESOLVE --> BRANCH
 
-    %% Top Lane: Fast Path (Green)
-    FAST["Single Local ACID Journal<br/><b>Debit Alice + Credit Bob</b>"]
-    TERM(["SUCCEEDED / FAILED<br/><i>(terminal)</i>"])
+    %% Fast Path
+    subgraph FAST_LANE ["Fast Path (Same Shard)"]
+        FAST["Single Local ACID Journal<br/><b>Debit Alice + Credit Bob</b>"]
+        TERM(["SUCCEEDED / FAILED<br/><i>(Terminal)</i>"])
+        FAST --> TERM
+    end
+
+    %% Cross Shard Saga Path
+    subgraph SAGA_LANE ["Durable Saga Path (Cross-Shard)"]
+        PARENT["Persist Parent Saga<br/><i>plan: accounts, shards, amounts</i>"]
+        ACK["Return PENDING + Transfer ID"]
+        SRC["Source Leg (Shard A)<br/><b>Debit Alice → Credit In-Transit</b>"]
+        DEST["Dest Leg (Shard B)<br/><b>Debit In-Transit → Credit Bob</b>"]
+        DONE(["COMPLETED"])
+        COMP["Compensate Source Leg (Shard A)<br/><b>Debit In-Transit → Credit Alice</b>"]
+
+        PARENT --> ACK
+        ACK --> SRC
+        SRC --> DEST
+        DEST -- "Success" --> DONE
+        DEST -- "Fatal Failure" --> COMP
+    end
 
     BRANCH -- "Yes" --> FAST
-    FAST --> TERM
-
-    %% Bottom Lane: Cross-Shard Saga Path (Blue)
-    PARENT["Persist Parent Saga<br/><i>plan: accounts, shards, amounts</i>"]
-    ACK["Return PENDING<br/><i>+ transfer id</i>"]
-    SRC["Source Leg (Shard A)<br/><b>Debit Alice → Credit In-Transit</b>"]
-    DEST["Dest Leg (Shard B)<br/><b>Debit In-Transit → Credit Bob</b>"]
-    DONE(["COMPLETED"])
-
-    %% Failure / Compensation (Red)
-    COMP["Compensate Source Leg (Shard A)<br/><b>Debit In-Transit → Credit Alice</b>"]
-
     BRANCH -- "No" --> PARENT
-    PARENT --> ACK
-    ACK --> SRC
-    SRC --> DEST
-    DEST -- "Success" --> DONE
-    DEST -- "Fatal Failure" --> COMP
 
     %% Styling
     classDef intake fill:#f8f9fa,stroke:#495057,stroke-width:2px,color:#212529;
@@ -113,14 +116,56 @@ flowchart LR
     class FAST,TERM fast;
     class PARENT,ACK,SRC,DEST,DONE saga;
     class COMP fail;
-```
+</pre>
+</div>
 
 > *Same-shard commits in one local transaction; cross-shard uses two local legs plus a durable parent, with value held in in-transit between legs.*
 
+<style>
+  .mermaid-wrapper {
+    width: 100%;
+    margin: 2rem 0;
+    text-align: center;
+    background: #ffffff;
+    padding: 1.5rem 1rem;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+  }
+  .mermaid-wrapper svg {
+    max-width: 100% !important;
+    height: auto !important;
+    font-size: 15px !important;
+  }
+</style>
+
 <script type="module">
   import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-  mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
-  await mermaid.run({
-    querySelector: '.language-mermaid',
+  mermaid.initialize({ 
+    startOnLoad: true, 
+    theme: 'neutral',
+    flowchart: {
+      useMaxWidth: true,
+      htmlLabels: true,
+      curve: 'basis'
+    }
   });
 </script>
+
+## Failure modes
+
+A distributed ledger cannot assume clean execution. It must maintain financial invariants across six distinct failure scenarios:
+
+**Crash before any leg commits.** If the host crashes immediately after accepting the transfer, no funds have moved. The background sweeper detects an expired lease on the `ACCEPTED` parent saga, claims it with a new lease token, and launches the source leg. *Invariant preserved:* Zero unrecorded intent; no money lost or orphaned.
+
+**Crash after source leg commits.** A process dies after committing the source journal on Shard A, but before updating the parent record. Funds sit legally in Shard A's in-transit account. Upon recovery, the sweeper queries Shard A using the deterministic step key (`transfer_id:source`). Finding the committed journal, it safely advances the parent state to `IN_TRANSIT` and dispatches the destination leg. *Invariant preserved:* Balance conservation; value remains locked in clearing rather than stranded.
+
+**Two workers claim the same step.** Network partitions or GC pauses can lead two workers to execute the same leg concurrently. Monotonic fencing tokens reject stale parent updates, while unique database constraints on the shard journal (`UNIQUE(step_key)`) ensure only one transaction commits; the duplicate fails on conflict. *Invariant preserved:* Exactly-once execution; zero duplicate debits or credits.
+
+**Unknown outcome after timeout.** A network call to Shard B times out mid-flight. The coordinator treats the outcome as unknown. It never guesses or triggers compensation prematurely. Instead, it queries Shard B's journal for the destination step key. If found, it marks completion; if absent, it safely retries. *Invariant preserved:* State determinism; never compensate a phantom leg or duplicate credits.
+
+**Destination leg fails permanently.** If Bob's account is closed or frozen, Shard B returns a non-retryable rejection. The coordinator initiates compensation only for confirmed committed legs. It posts an idempotent mirror journal on Shard A (debit in-transit, credit Alice). *Invariant preserved:* Conservation of funds; Alice's usable balance is restored, and clearing nets to zero.
+
+**Client retries while PENDING.** If a client re-submits the request under network jitter, the gateway resolves the idempotency key to the existing parent record and returns the current `PENDING` status. No second execution plan is generated. *Invariant preserved:* Request idempotency.
+
+These failure modes are why durable parent state, deterministic step identities, and a strict rule to compensate only what is confirmed committed are non-negotiable requirements in financial systems.
