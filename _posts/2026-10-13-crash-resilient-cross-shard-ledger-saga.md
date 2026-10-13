@@ -64,3 +64,63 @@ The architecture splits execution into two pathways based on account placement, 
 Every transaction is balanced locally ($Debits = Credits$), while the inter-shard clearing positions net to zero across the platform.
 
 **Durable state machine and crash recovery.** The parent saga enforces forward progress through explicit, legal transitions: `ACCEPTED` → `IN_TRANSIT` → `COMPLETED`. Client retries with the same idempotency key safely return the current parent record without re-executing steps. If a coordinator or worker crashes mid-transfer, a background sweeper reconstructs progress directly from durable state and resumes execution. If the destination leg permanently fails, the system executes an idempotent compensation: it posts a new balanced mirror journal on Shard A (debiting clearing and crediting the sender) to return funds to Alice, rather than attempting a distributed database rollback.
+
+### Execution Flow & Money Movement
+
+The following left-to-right flow illustrates the bifurcation between the same-shard fast path and the durable cross-shard saga pipeline:
+
+```mermaid
+flowchart LR
+    %% Intake (Left)
+    REQ["Transfer Request<br/><i>(idempotency key)</i>"]
+    RESOLVE["Resolve Shard<br/>Placement"]
+    BRANCH{"Same<br/>Shard?"}
+
+    REQ --> RESOLVE
+    RESOLVE --> BRANCH
+
+    %% Top Lane: Fast Path (Green)
+    FAST["Single Local ACID Journal<br/><b>Debit Alice + Credit Bob</b>"]
+    TERM(["SUCCEEDED / FAILED<br/><i>(terminal)</i>"])
+
+    BRANCH -- "Yes" --> FAST
+    FAST --> TERM
+
+    %% Bottom Lane: Cross-Shard Saga Path (Blue)
+    PARENT["Persist Parent Saga<br/><i>plan: accounts, shards, amounts</i>"]
+    ACK["Return PENDING<br/><i>+ transfer id</i>"]
+    SRC["Source Leg (Shard A)<br/><b>Debit Alice → Credit In-Transit</b>"]
+    DEST["Dest Leg (Shard B)<br/><b>Debit In-Transit → Credit Bob</b>"]
+    DONE(["COMPLETED"])
+
+    %% Failure / Compensation (Red)
+    COMP["Compensate Source Leg (Shard A)<br/><b>Debit In-Transit → Credit Alice</b>"]
+
+    BRANCH -- "No" --> PARENT
+    PARENT --> ACK
+    ACK --> SRC
+    SRC --> DEST
+    DEST -- "Success" --> DONE
+    DEST -- "Fatal Failure" --> COMP
+
+    %% Styling
+    classDef intake fill:#f8f9fa,stroke:#495057,stroke-width:2px,color:#212529;
+    classDef fast fill:#ebfbee,stroke:#2b8a3e,stroke-width:2px,color:#2b8a3e;
+    classDef saga fill:#e7f5ff,stroke:#1971c2,stroke-width:2px,color:#1971c2;
+    classDef fail fill:#ffe3e3,stroke:#c92a2a,stroke-width:2px,color:#c92a2a;
+
+    class REQ,RESOLVE,BRANCH intake;
+    class FAST,TERM fast;
+    class PARENT,ACK,SRC,DEST,DONE saga;
+    class COMP fail;
+```
+
+> *Same-shard commits in one local transaction; cross-shard uses two local legs plus a durable parent, with value held in in-transit between legs.*
+
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
+  await mermaid.run({
+    querySelector: '.language-mermaid',
+  });
+</script>
