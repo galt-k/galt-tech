@@ -74,19 +74,19 @@ Net Balance: $0.00 (Debits == Credits)
 ### Invariants Maintained
 
 1. **Local Balance Invariant:** Every single journal entry posted to any database engine satisfies:
-   $$\sum \text{Debits} = \sum \text{Credits}$$
+   `Total Debits == Total Credits`
    No unbalanced journal is ever permitted to commit. This is enforced by database schema checks and domain validators before insert.
 
-2. **Temporal Clearing Position:** Between time $t_1$ (when Shard A commits) and time $t_2$ (when Shard B commits), the transfer is in-flight. During this window:
+2. **Temporal Clearing Position:** Between time t1 (when Shard A commits) and time t2 (when Shard B commits), the transfer is in-flight. During this window:
    - Alice's usable balance has decreased by $50.00.
    - Shard A's in-transit clearing account reflects a credit balance of $50.00 (a liability: funds held for transfer to Shard B).
    - Bob has not yet received funds.
    - Across the platform, total user balances have temporarily decreased by $50.00, offset exactly by the $50.00 sitting in clearing.
 
-3. **Global Reconciliation Invariant:** Once Shard B commits at $t_2$:
+3. **Global Reconciliation Invariant:** Once Shard B commits at t2:
    - Shard B's clearing account reflects a debit balance of $50.00 (an asset: receivable due from Shard A).
    - Across the entire fleet, the inter-shard clearing positions net to zero:
-     $$\text{Clearing}_{\text{Shard A}} (+50.00) + \text{Clearing}_{\text{Shard B}} (-50.00) = \$0.00$$
+     `Clearing(Shard A) [+$50.00] + Clearing(Shard B) [-$50.00] == $0.00`
 
 4. **Account Balance Non-Negativity:** The database enforces a `CHECK (amount_minor >= 0)` constraint on `account_balance`. If Alice's account has insufficient funds, Shard A's local transaction fails immediately; no funds move and no cross-shard saga is initiated.
 
@@ -172,8 +172,8 @@ In distributed systems, **exactly-once execution does not exist across a network
 
 However, the ledger guarantees **at-most-once committed financial effects per logical step**:
 - Every leg is assigned a deterministic step identity:
-  $$\text{step\_key}_{\text{source}} = \text{transfer\_id} + \text{":source"}$$
-  $$\text{step\_key}_{\text{dest}} = \text{transfer\_id} + \text{":dest"}$$
+  - `step_key_source = transfer_id + ":source"`
+  - `step_key_dest = transfer_id + ":dest"`
 - When a worker appends a journal entry, the write includes `operation_key = step_key`.
 - The database schema enforces `CONSTRAINT ledger_journal_operation_unique UNIQUE (operation_key)`.
 - If two workers attempt to commit the same step, exactly one transaction commits; the second fails with a unique constraint violation and rolls back completely.
