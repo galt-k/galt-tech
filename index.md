@@ -9,5 +9,7 @@ sidebar:
 
 Critical, no-compromise explorations of Rust, Java, and systems programming.
 
-## Latest Article
-[Critical Evaluation: Generics in Rust vs Java]({{ site.baseurl }}{% post_url 2025-12-11-rust-vs-java-generics %})
+## Latest Articles
+
+- [Building a Crash-Resilient, Cross-Shard Ledger Saga in Java 21]({{ site.baseurl }}{% post_url 2026-10-13-crash-resilient-cross-shard-ledger-saga %})
+- [Critical Evaluation: Generics in Rust vs Java]({{ site.baseurl }}{% post_url 2025-12-11-rust-vs-java-generics %})
