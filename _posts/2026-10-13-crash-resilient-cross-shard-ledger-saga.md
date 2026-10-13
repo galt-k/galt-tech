@@ -169,3 +169,17 @@ A distributed ledger cannot assume clean execution. It must maintain financial i
 **Client retries while PENDING.** If a client re-submits the request under network jitter, the gateway resolves the idempotency key to the existing parent record and returns the current `PENDING` status. No second execution plan is generated. *Invariant preserved:* Request idempotency.
 
 These failure modes are why durable parent state, deterministic step identities, and a strict rule to compensate only what is confirmed committed are non-negotiable requirements in financial systems.
+
+## Production notes
+
+In high-throughput deployments, the primary bottlenecks are rarely raw CPU cycles. System saturation stems from database connection pool exhaustion and row-lock contention on hot accounts. Holding transactions open across network boundaries guarantees connection starvation; keeping ledger writes strictly local and short-lived protects shard pools.
+
+Teams often delegate saga tracking and retry schedules to dedicated workflow engines like Temporal. While external orchestrators excel at execution history and timers, the ledger service must maintain strict ownership of accounting domain rules: balanced double-entry journals, in-transit clearing positions, and single-writer shard mutations.
+
+Upstream callers must respect the bifurcated contract. Same-shard transfers return immediate, synchronous settlement in single-digit milliseconds. Cross-shard transfers return an accepted acknowledgment with `PENDING`. Upstream callers, such as checkout or payout pipelines, must never treat `PENDING` as final settlement. They must await asynchronous domain events or poll the transfer status before fulfilling orders or releasing external funds.
+
+## Takeaways
+
+1. **Optimize the local path:** When accounts share a database shard, execute a single local ACID journal; never pay distributed coordination costs when you already possess local atomicity.
+2. **Conserve value across boundaries:** Never move money between shards without an explicit in-transit clearing position; every individual leg must balance locally at every point in time.
+3. **Design for arbitrary crashes:** Eliminate distributed locks in favor of durable parent intent, deterministic step keys, and compensating only legs confirmed to have committed.
