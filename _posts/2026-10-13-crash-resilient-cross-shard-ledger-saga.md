@@ -48,3 +48,19 @@ A viable architecture must satisfy five hard constraints imposed by double-entry
 **Bifurcated latency profiles.** The design must respect two distinct operational SLAs. Same-shard transfers belong to a low-latency fast path that resolves synchronously in single-digit milliseconds. Cross-shard transfers span independent physical boundaries and cannot guarantee instantaneous completion, requiring a contractual transition to an asynchronous `PENDING` state.
 
 Together, these constraints rule out distributed locks, two-phase commit, and any expectation of global atomicity. They force the system into a split architecture: an immediate single-shard transactional path, and an explicit, durable multi-leg coordination path that treats in-transit money as a first-class ledger position.
+
+## Design
+
+The architecture bifurcates execution into two distinct pathways based on account placement, governed by a strict single-writer model: only the ledger service holding affinity for a specific shard may mutate that shard's journals and balances, while a coordinator manages parent saga lifecycle state.
+
+**Placement-first routing.** When a transfer request arrives, the system resolves the physical shard mapping for both accounts before touching ledger state. If both accounts reside on the same shard, execution takes the synchronous fast path: a single, short ACID transaction posts the balanced debit and credit directly to the local journal. It returns a terminal success or failure immediately, bypassing saga machinery entirely.
+
+**Durable asynchronous acceptance.** When accounts map to different shards, the system rejects two-phase locking. Instead, the coordinator registers the request under a client-provided idempotency key and durably commits a parent saga record containing the immutable execution plan: account identifiers, shard assignments, amounts, and policy versions. The API immediately returns HTTP `202 Accepted` with a stable transfer identifier and a `PENDING` status. The system now assumes ownership of driving the transfer to completion.
+
+**Balanced in-transit clearing.** Money never crosses shard boundaries untracked. Each shard hosts an internal in-transit clearing account. Coordination proceeds across two independent, balanced journal legs:
+1. **Source leg (Shard A):** Debits the sender and credits Shard A's in-transit account in a single local transaction. The sender's usable balance decreases immediately.
+2. **Destination leg (Shard B):** Debits Shard B's in-transit account and credits the recipient in a single local transaction.
+
+At every point in time, total debits equal total credits within each database engine. Cross-shard clearing balances offset each other at the system level.
+
+**Durable state machine and crash recovery.** The parent saga enforces forward progress through explicit, legal transitions: `ACCEPTED` → `IN_TRANSIT` → `COMPLETED`, or into compensation paths if the destination leg encounters a non-retryable failure. Client retries with the same idempotency key safely return the current parent record without re-executing steps. If a coordinator or worker crashes mid-transfer, a background recovery process reconstructs progress directly from durable state, re-dispatching pending legs or triggering idempotent compensations—reversing only legs confirmed to have committed.
