@@ -32,3 +32,19 @@ A financial ledger cannot tolerate these failure modes. It operates under non-ne
 Reaching for two-phase commit (2PC) or distributed transactions across database shards is the wrong default at scale. 2PC holds row locks across network round trips, coupling the availability and latency of independent databases. A degraded disk or network hiccup on Shard B stalls transactions on Shard A, rapidly exhausting connection pools and cascading outages across the platform.
 
 The architectural challenge is twofold: we must preserve a synchronous, sub-5ms local ACID path when accounts share a shard, while treating cross-shard movement as a first-class asynchronous pipeline—one that acknowledges work as pending, coordinates multi-database steps durably, and recovers from process crashes and concurrent retries without holding locks across database boundaries.
+
+## Constraints
+
+A viable architecture must satisfy five hard constraints imposed by double-entry accounting, distributed databases, and physical hardware limits:
+
+**Zero-sum conservation under partial execution.** Debits must equal credits within every posted journal entry. If a transfer is interrupted mid-flight, funds cannot vanish into an unrecorded void or appear out of thin air. When funds are debited from the sender on Shard A, they immediately post to a balanced, in-transit clearing position on Shard A. Alice's usable balance decreases immediately, while the public transfer status remains `PENDING` until the destination leg resolves.
+
+**Partitioned concurrency boundaries.** Database transactions are strictly local to a single shard. An operation executed on Shard A cannot hold row locks, reserve connections, or block execution on Shard B. Every database write must commit independently.
+
+**Deterministic idempotency under arbitrary crash points.** A process crash, timeout, or network disconnect can occur between any two instructions: after writing to Shard A, before dispatching to Shard B, or while returning a response to the client. Identical client retries must never double-debit an account or produce divergent ledger states.
+
+**Bounded compute and connection capacity.** Database connection pools and thread workers are finite. Synchronous operations cannot block awaiting external network hops or remote shard confirmations. Latency spikes on one shard must never monopolize connections or cascade failure to healthy shards.
+
+**Bifurcated latency profiles.** The design must respect two distinct operational SLAs. Same-shard transfers belong to a low-latency fast path that resolves synchronously in single-digit milliseconds. Cross-shard transfers span independent physical boundaries and cannot guarantee instantaneous completion, requiring a contractual transition to an asynchronous `PENDING` state.
+
+Together, these constraints rule out distributed locks, two-phase commit, and any expectation of global atomicity. They force the system into a split architecture: an immediate single-shard transactional path, and an explicit, durable multi-leg coordination path that treats in-transit money as a first-class ledger position.
