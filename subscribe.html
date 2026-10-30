@@ -1,0 +1,28 @@
+---
+layout: default
+title: "How can I follow new posts?"
+permalink: /subscribe/
+---
+<article class="about prose">
+<p class="eyebrow">FOLLOW GALTSYSTEMS</p>
+<h1>How can I follow new posts?</h1>
+<p>Use a feed reader to see new GaltSystems essays alongside the other sites you follow. No email address or account on this site is needed.</p>
+<h2>How does RSS work?</h2>
+<p>A feed reader checks this site's feed for new posts and collects them in one place. The feed uses Atom, a format supported by RSS readers.</p>
+<ol><li>Open your preferred feed reader.</li><li>Choose its option to add or follow a website.</li><li>Paste the feed address below and confirm in your reader.</li></ol>
+<div class="feed-address">
+<label for="feed-url">Feed address</label>
+<input id="feed-url" type="url" readonly value="{{ '/feed.xml' | absolute_url }}" spellcheck="false">
+<button id="copy-feed" type="button" hidden>Copy feed address</button>
+<p id="copy-status" role="status" aria-live="polite"></p>
+</div>
+<p><a href="{{ '/feed.xml' | relative_url }}">Open the raw feed (XML) ↗</a></p>
+<p>The raw feed may look like code in your browser. That is normal: it is designed for your feed reader.</p>
+<p><a href="{{ '/' | relative_url }}">← Back to the notebook</a></p>
+</article>
+<style>
+.feed-address{background:var(--note);padding:24px;border:1px solid var(--line);border-radius:5px}.feed-address label{display:block;font:14px/1.5 Arial,sans-serif;margin-bottom:10px}.feed-address input{display:block;width:100%;min-width:0;background:var(--paper);color:var(--ink);border:1px solid var(--line);padding:12px;font:14px/1.5 monospace;border-radius:3px}.feed-address button{margin-top:14px;background:var(--accent);color:#fff;border:0;border-radius:3px;padding:12px 16px;font:14px/1.5 Arial,sans-serif}.feed-address #copy-status{font:14px/1.6 Arial,sans-serif;margin-bottom:0}.feed-address input:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+</style>
+<script>
+(()=>{const button=document.getElementById('copy-feed');const input=document.getElementById('feed-url');const status=document.getElementById('copy-status');button.hidden=false;button.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(input.value);status.textContent='Feed address copied. Paste it into your feed reader.';}catch{input.focus();input.select();status.textContent='Select and copy the feed address above, then paste it into your reader.';}});})();
+</script>
