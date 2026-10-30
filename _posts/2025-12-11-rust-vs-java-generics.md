@@ -1,8 +1,8 @@
 ---
 layout: single  # Full article layout with sidebar/TOC
-title: "Generics in Rust vs Java, A Deep-Dive Performance Audit"
-seo_title: "Rust vs Java Generics: Performance & Memory Audit"
-excerpt: "A deep-dive technical audit comparing Rust's static dispatch with Java's type erasure and V-Table overhead."
+title: "Why do generics behave differently in Rust and Java?"
+seo_title: "Why do generics behave differently in Rust and Java?"
+excerpt: "How monomorphization, type erasure, and runtime optimization shape the tradeoffs of generic code."
 description: "Engineering comparison of Rust monomorphization vs Java type erasure. Covers memory layout, V-Tables, and binary bloat."
 date: 2025-12-11
 tags:

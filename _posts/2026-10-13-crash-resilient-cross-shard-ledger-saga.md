@@ -1,8 +1,8 @@
 ---
 layout: single
-title: "Building a Crash-Resilient, Cross-Shard Ledger Saga in Java 21"
-seo_title: "Distributed Ledger Saga: Cross-Shard Transfers in Java 21 & PostgreSQL"
-excerpt: "A deep dive into building a double-entry ledger that coordinates cross-shard transfers with zero money loss using durable sagas, in-transit clearing accounts, and PostgreSQL fencing tokens."
+title: "How can a cross-shard transfer recover from a crash?"
+seo_title: "How can a cross-shard transfer recover from a crash?"
+excerpt: "Building a Java ledger that handles crashes and retries with durable sagas, clearing accounts, and idempotent writes."
 description: "How to design and implement an asynchronous, crash-resilient distributed ledger Saga in Java 21 and PostgreSQL. Covers double-entry invariants, zero-sum clearing accounts, worker fencing, and concrete database constraints."
 date: 2026-10-13
 tags:

@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+{% seo %}{% feed_meta %}
+<link rel="stylesheet" href="{{ '/assets/css/galtsystems.css' | relative_url }}">
+<script src="{{ '/assets/js/galtsystems.js' | relative_url }}" defer></script>
+</head>
+<body><a class="skip-link" href="#main">Skip to content</a>
+<div class="site-shell">
+<header class="site-header"><a class="brand" href="{{ '/' | relative_url }}">GaltSystems<span>FIELD NOTES / BY GALT</span></a><nav aria-label="Main navigation"><a href="{{ '/' | relative_url }}">Writing</a><a href="{{ '/about/' | relative_url }}">About</a><a href="{{ '/feed.xml' | relative_url }}">RSS</a></nav></header>
+<main id="main">{{ content }}</main>
+<footer class="site-footer"><span>A notebook, not a finished theory.</span><div><a href="https://github.com/galt-k">GitHub</a><a href="{{ '/feed.xml' | relative_url }}">RSS</a><span>© {{ 'now' | date: '%Y' }} GaltSystems</span></div></footer>
+</div></body></html>
