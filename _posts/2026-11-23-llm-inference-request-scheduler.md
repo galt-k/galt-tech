@@ -1,146 +1,217 @@
 ---
 layout: single
 title: "How do you schedule LLM inference without losing ownership of the work?"
-seo_title: "Designing an LLM Inference Request Scheduler in Java 21"
-excerpt: "A Java 21 case study in FIFO batching, bounded execution, cancellation races, and the difference between a notification and available capacity."
-description: "Designing a Java LLM inference request scheduler through explicit ownership, condition-based waiting, shutdown boundaries, and reproducible concurrency investigations."
+seo_title: "Execution Ownership in a Java LLM Inference Request Scheduler"
+excerpt: "How explicit ownership prevents premature capacity release across caller timeouts, asynchronous completion, cancellation, and shutdown."
+description: "A Java 21 engineering exercise in execution-slot ownership: state transitions, completion callbacks, shutdown boundaries, caller-timeout tests, and implementation tradeoffs."
 date: 2026-11-23
 topic: Engineering
 tags:
   - Java
   - Concurrency
   - LLM Inference
-  - Distributed Systems
-  - Performance
+  - System Design
 toc: true
 toc_sticky: true
 ---
 
-An inference scheduler can form perfectly valid batches and still fail to make progress. It can also report that a batch has finished while leaving its execution capacity permanently occupied. Neither failure requires a complicated algorithm. Both can come from an unclear boundary between selecting work, authorizing execution, and returning resources.
+## The problem: when is execution capacity really free?
 
-I built a Java 21 scheduler to study those boundaries. The implementation groups FIFO requests into batches, limits outstanding execution attempts, and coordinates cancellation and shutdown. Alongside it, I used small incident simulators to investigate missing notifications and circular lock dependencies.
+Build a Java request scheduler that forms batches for an inference backend and permits at most two outstanding execution attempts. It must preserve that bound when callers stop waiting, completion callbacks arrive early or twice, and shutdown races with submission. It must also keep responsibility for requests clear as they move from the pending queue to the backend.
 
-This article describes the design and the reasoning behind it. The implementation is a learning prototype with incomplete shutdown semantics. Its backend is an abstraction; the performance results below come from a timer-based simulator, not a model server or GPU benchmark.
+Consider the failure we want to avoid:
 
-**Code and design:** [Java implementation and exercises](https://github.com/galt-k/galt-projects/tree/main/java/concurrency-lab) · [Design document](https://github.com/galt-k/galt-projects/blob/main/java/concurrency-lab/problem-003-inference-batch-scheduler/design.md)
+```text
+A and B are executing. Both slots are occupied.
+A's caller times out.
+The serving layer returns A's slot and admits C.
+A has not stopped: A, B, and C may now execute concurrently.
+```
 
-## Where the scheduler sits
+The slot counter can say “two” while three batches are running. The error is the event that returned capacity: the caller stopped waiting, but execution did not necessarily stop.
 
-A chat or agent system has several kinds of scheduling. An agent orchestrator decides which model call or tool invocation happens next. A serving layer decides whether a model request can enter the system and when to submit it. An inference engine decides how to execute prefill and decode against finite compute and memory.
+The design rule is:
 
-This project explores the serving-layer boundary:
+> Release execution capacity only after definite rejection, execution completion, or confirmation that execution stopped. A caller timeout alone is insufficient.
+
+I built a Java 21 learning prototype to explore that rule. It has FIFO batching, execution reservations, and an explicit handoff boundary. It is not a production inference service: the backend is an interface, caller deadlines and backend cancellation are not implemented, and queued-work shutdown policy remains unfinished. A separate fake-backend test verifies that timing out a caller-side wait leaves execution ownership intact.
+
+**Code and design:** [Java implementation](https://github.com/galt-k/galt-projects/blob/main/java/concurrency-lab/problem-003-inference-batch-scheduler/src/main/java/dev/concurrencylab/batching/BatchScheduler.java) · [Design document](https://github.com/galt-k/galt-projects/blob/main/java/concurrency-lab/problem-003-inference-batch-scheduler/design.md) · [Caller-timeout test](https://github.com/galt-k/galt-projects/blob/main/java/concurrency-lab/problem-003-inference-batch-scheduler/src/test/java/dev/concurrencylab/batching/CallerTimeoutTest.java)
+
+## Scope: the serving layer, not the inference engine
+
+A chat or agent orchestrator may make several model calls for one customer turn. This scheduler coordinates those requests before passing work to an execution backend.
 
 ```text
 Chat / agent orchestrator
-        |
-        v
-Pending model requests
-        |
-        v
-Java request scheduler
-  - FIFO batch formation
-  - execution reservations
-  - cancellation and handoff
-        |
-        v
-Inference backend abstraction
-        |
-        v
-Completion notification
+          |
+          v
+Pending requests -> Java scheduler -> Backend abstraction
+                          ^                   |
+                          |                   v
+                    Return capacity <- Completion callback
 ```
 
-For a future connection to a real inference engine, tokenization, KV-cache reuse, continuous batching, and generation can remain inside that engine. A Java batch should not be assumed to correspond to a GPU batch. The backend adapter must make that distinction explicit.
+A future backend adapter may delegate tokenization, KV-cache reuse, continuous batching, and generation to an inference engine. A Java batch must not be assumed to equal a GPU batch.
 
-## Two bounds that answer different questions
+The exercise has two kinds of limits:
 
-The exercise uses three configuration values:
-
-| Constraint | Value | Question it answers |
+| Limit | Configuration | Purpose |
 | --- | --- | --- |
-| Requests per batch | 8 | How many requests may one submission contain? |
-| Estimated token units per batch | 4,096 | How much estimated work may one batch contain? |
-| Outstanding execution reservations | 2 | How many attempts may own backend capacity at once? |
+| Batch size | At most 8 requests and 4,096 estimated token units | Bound the work grouped into one submission |
+| Execution capacity | At most 2 owned slots | Bound outstanding attempts across batches |
 
-The token limit shapes a batch. The slot limit constrains concurrency across batches.
+A slot is not a dedicated Java thread. The scheduler can submit A and B asynchronously and wait for capacity before submitting more work. Two slots also do not establish a real accelerator-memory bound. The values are exercise settings, not production tuning recommendations.
 
-If A and B already own the two execution slots, C must wait even if it contains only one small request. Conversely, a free execution slot does not make an oversized batch valid.
+## Represent responsibility as ownership
 
-A slot is permission for an attempt to remain outstanding. It is not a particular Java thread. The scheduler thread can submit A, submit B, and then wait while the backend executes both asynchronously. Two slots also do not prove that both batches fit real accelerator memory; that would require a separate capacity model.
+The design separates responsibility for requests from ownership of execution capacity.
 
-These values define a tractable exercise. They are not tuned production recommendations.
+| Stage | Responsibility for the work | Execution capacity |
+| --- | --- | --- |
+| Pending | Queue retains requests; cancellation can remove them | None |
+| Reserved | Requests remain pending | Attempt owns a slot |
+| Committed and detached | Dispatch operation must submit or report its outcome | Slot remains owned |
+| Accepted | Executor must execute and report completion | Slot remains owned until confirmed finish |
+| Definitely rejected | Caller receives detached batch for disposition | Slot is returned |
 
-## Make ownership explicit before choosing the primitive
+There are two attempt states:
 
-The central invariant is simple:
+```text
+Absent -> RESERVED -> HANDING_OFF
+             |              |
+             | abandon      | rejection, completion,
+             | or shutdown  | or confirmed stopping
+             v              v
+           Absent         Absent
+```
 
-> Every outstanding attempt owns exactly one reservation, and that reservation can be returned at most once.
+`HANDING_OFF` means committed to submission. The state continues to represent an accepted, unfinished execution; it does not prove that execution has started.
 
-The implementation represents ownership with a map:
+The active map is the source of truth:
 
 ```java
-private final Map<Long, AttemptState> activeAttempts = new LinkedHashMap<>();
+private final LinkedHashMap<Long, AttemptState> activeAttempts =
+        new LinkedHashMap<>();
 ```
 
-Presence means ownership. Map size is the occupied-slot count. Removing an entry returns capacity.
+Each entry owns one slot. Its size is the occupied-slot count. State validation and removal use the same shared `ReentrantLock` as reservation and commitment.
 
-This avoids maintaining a separate atomic counter that must agree with the map. An atomic increment would protect the integer itself, but not the combined operation of validating identity, checking capacity, and recording ownership.
+An attempt ID identifies one execution attempt, not a customer or request. Retries require fresh identities. Otherwise, a late completion for an old execution could release a newer reservation. IDs must never be reused; the integrated path allocates a monotonic negative range and rejects exhaustion.
 
-All those changes use one shared `ReentrantLock`.
+## Commit before detaching, register before submitting
 
-Each attempt has one of two states:
+Removing a batch before capacity is available creates another ownership problem: an interruption can leave requests outside the queue without a backend responsible for them.
 
-```text
-                         commit handoff
-Absent -> RESERVED --------------------------> HANDING_OFF
-             |                                      |
-             | abandonment or shutdown              | rejection or confirmed finish
-             v                                      v
-           Absent                                 Absent
-```
+The chosen flow keeps requests pending until the dispatch decision is secured. Under the shared lock, the scheduler:
 
-`HANDING_OFF` means the scheduler has committed to submission. It continues to represent ownership after the executor accepts. There is no separate running state in this slice.
-
-Attempt identity is distinct from request identity. A retry must receive a fresh attempt ID so a late completion from an earlier attempt cannot release newer ownership. Completed records need not remain forever if IDs are never reused.
-
-## Keep work pending until handoff is secured
-
-Detaching a batch early creates another owner to manage. Suppose the scheduler removes requests, then waits for capacity. If interrupted or shut down, it must now recover work that is no longer in the pending queue.
-
-I chose to retain requests in the queue until capacity and commitment are secured.
-
-Under the shared lock, the scheduler:
-
-1. Checks shutdown and whether requests are pending.
-2. Inspects a FIFO prefix without removing it.
-3. Checks the batch window and execution capacity.
-4. Reserves an attempt and commits handoff.
+1. Checks shutdown and pending work.
+2. Inspects a FIFO batch candidate and its forming window.
+3. Checks execution capacity.
+4. Registers a `RESERVED` attempt and commits it to `HANDING_OFF`.
 5. Detaches the selected requests before releasing the lock.
 
-Only then does it call the executor, outside the lock.
+It then calls external executor code outside the lock.
 
-The inspection result is a `Candidate`: a request count, token total, and indication that a limit was reached. It is not a `Batch`, does not contain the requests, and does not transfer ownership.
+The five-millisecond batching window is a readiness threshold, not a latency guarantee. Hitting a request/token limit, encountering a next FIFO request that cannot fit, or reaching window expiry makes a batch eligible. Capacity can still delay it.
 
-Cancellation remains possible while requests are pending. Once commitment and detachment happen in the protected dispatch transition, queue-level cancellation is too late.
-
-## Waiting invalidates observations
-
-A condition wait releases the lock. That is how producers, cancellation callers, and completion callbacks can make the state useful to the scheduler.
-
-It also means a candidate inspected before waiting may be stale afterward.
-
-One review exercise exposed this sequence:
+The ordering also handles immediate completion. The executor may invoke its completion callback before its submission method returns:
 
 ```text
-Scheduler inspects three requests totaling 300 token units.
-Both execution slots are occupied; scheduler waits.
-A cancellation removes one request.
-Completion returns a slot.
-Scheduler wakes with an old candidate describing three requests.
+Register ownership -> commit -> detach -> unlock -> submit
+                                                    |
+                                             inline completion
+                                                    |
+                                             remove ownership
+                                                    |
+                                             return ACCEPTED
 ```
 
-Reusing that candidate can detach the wrong prefix or fail because fewer requests remain. Refreshing only the count is insufficient: cancellation may also empty the queue or change which batching window applies.
+The accepted return must not recreate the entry or return the slot again. Ownership existed before the callback became possible.
 
-The corrected capacity branch restarts the full decision loop:
+## End execution ownership exactly once
+
+The submission path passes a cleanup callback:
+
+```java
+executor.submit(attemptId, batch, () -> releaseExecution(attemptId))
+```
+
+The executor contract requires that callback to mean execution finished, failed and stopped, or was confirmed stopped. “Cancellation received” is not enough.
+
+The cleanup transition is small:
+
+```java
+public boolean releaseExecution(long attemptId) {
+    lock.lock();
+    try {
+        AttemptState state = activeAttempts.get(attemptId);
+        if (state != AttemptState.HANDING_OFF) {
+            return false;
+        }
+        activeAttempts.remove(attemptId);
+        changed.signalAll();
+        return true;
+    } finally {
+        lock.unlock();
+    }
+}
+```
+
+Only removal returns capacity. Duplicate cleanup finds no owned entry and returns false. A late callback cannot remove another attempt when identities are never reused.
+
+The condition signal tells waiters to reconsider state; it does not assign the returned slot. They must reacquire the lock, check capacity, and register ownership atomically.
+
+A separate abandonment operation removes only `RESERVED` attempts when the scheduler exits before commitment. Keeping these cleanup operations state-specific prevents pre-handoff failure handling from reclaiming capacity belonging to committed execution.
+
+## A timeout ends waiting, not execution
+
+The scheduler currently preserves ownership through its documented cleanup paths. It does not contain a request-timeout API or backend cancellation protocol. Its public release method cannot independently verify why it was invoked; correct use still depends on the executor and caller contracts.
+
+The new test makes that boundary observable with a controlled backend:
+
+1. Submit two full-token batches and have the fake backend accept both without completing them.
+2. Wait on a separate response future with a short timeout.
+3. Verify the wait timed out and both attempt entries remain `HANDING_OFF`.
+4. Explicitly finish A through its backend callback; verify only B remains.
+5. Deliver A's completion again; verify B is unchanged.
+6. Finish B; verify no execution ownership remains.
+
+The caller-side timeout is:
+
+```java
+assertThrows(TimeoutException.class,
+        () -> firstReply.get(20, TimeUnit.MILLISECONDS));
+```
+
+The ownership assertion immediately afterward is:
+
+```java
+assertEquals(bothOwned, ownership(scheduler),
+        "Both execution slots must remain owned after the caller stops waiting");
+```
+
+The fake backend cannot finish spontaneously, so the test does not depend on scheduling execution “slowly enough.” The timeout duration is a test bound, not a serving deadline. This verifies the demonstrated composition of caller waiting and backend completion; it does not prove the behavior of a future HTTP timeout handler.
+
+Result delivery is another responsibility. A real service might discard a response after disconnection, store a background result, or request cancellation. None of those policies justifies returning execution capacity before the work stops. Because our slots belong to batches, cancelling one request would not establish that the entire batch has completed.
+
+## Shutdown must preserve committed cleanup
+
+Shutdown and commitment serialize through the same lock. If shutdown wins, the uncommitted reservation is reclaimed. If commitment wins, submission remains authorized, even if its physical executor call begins after shutdown starts.
+
+Shutdown preserves `HANDING_OFF` attempts. Their completion callbacks must still release ownership afterward.
+
+One review bug violated this rule by returning early from cleanup whenever shutdown was true. Finished batches remained in the active map. The correction was to keep admission decisions separate from cleanup eligibility.
+
+This is only partial shutdown behavior. The current submission method still accepts pending requests after shutdown, and integrated dispatch stops without draining them. The design must choose whether queued work is drained, cancelled, or returned before it can promise graceful shutdown and full termination.
+
+## Waiting also changes what the scheduler knows
+
+Ownership is only as sound as the decision that selects the work. A condition wait releases the lock, allowing producers and cancellation callers to change the queue.
+
+A candidate describing three requests may be invalid after waiting for capacity if one request was cancelled. It is an inspection result, not a protected reservation of those requests.
+
+The corrected capacity branch waits once and restarts the outer decision loop:
 
 ```java
 if (activeAttempts.size() >= MAX_EXECUTION_SLOTS && !shutdown) {
@@ -149,123 +220,37 @@ if (activeAttempts.size() >= MAX_EXECUTION_SLOTS && !shutdown) {
 }
 ```
 
-This snippet sits inside an outer loop under the shared lock. On wakeup, the scheduler checks shutdown, queue contents, readiness, and capacity again. The outer loop supplies repeated condition checking; this is not a single unchecked wait.
+After waking, the outer loop checks shutdown, queue contents, batch readiness, and capacity again. This preserves pending ownership until a fresh decision can commit and detach the selected requests under one lock.
 
-The general rule is stronger than “put waits in loops”: identify every observation invalidated while the lock is released, then recompute the decision from shared state.
+## Tradeoffs of the design
 
-## Completion can happen before submission returns
-
-The executor contract allows an accepted batch to finish immediately and invoke its callback inline. Ownership must therefore exist before external submission begins.
-
-The unsafe ordering is:
-
-```text
-Submit to executor
-Callback runs and finds no ownership
-Register ownership
-```
-
-Execution has finished, but its newly registered reservation remains stuck.
-
-The chosen ordering is:
-
-```text
-Register and commit ownership under lock
-Detach batch
-Unlock
-Submit with completion callback
-```
-
-If the callback runs immediately, it finds the committed attempt and removes it. The later `ACCEPTED` return does not register it again or release it a second time.
-
-Release checks state and removes ownership under the same lock. A duplicate callback finds no entry and does nothing. Cleanup uses ordinary lock acquisition so an already-set interruption flag does not prevent the caller from returning resources.
-
-## Shutdown is a decision boundary
-
-A reservation is not yet permission to execute. Shutdown can reclaim an attempt that remains `RESERVED`, but must preserve an attempt already committed as `HANDING_OFF`.
-
-Both operations use the same lock:
-
-| Ordering | Result |
-| --- | --- |
-| Shutdown wins before commitment | Reservation is removed; dispatch stops |
-| Commitment wins before shutdown | Ownership remains; submission may proceed |
-
-This contract permits the physical executor call to begin after shutdown starts if commitment won first. Preventing every executor call from beginning after shutdown would require a different contract.
-
-Cleanup must continue after shutdown. An early review bug checked shutdown inside execution release and refused cleanup. That left finished batches in the active map. Closing admission and completing existing ownership are different transitions.
-
-The full lifecycle remains unfinished. The current request-submission path still admits pending requests after shutdown, and integrated dispatch leaves queued work pending when it stops. Draining, cancelling, or returning that work must be decided before this can be called graceful shutdown. The public shutdown getter also needs a defined cross-thread visibility guarantee.
-
-## Returning an outcome is part of returning ownership
-
-Dispatch reports one of three outcomes:
-
-| Outcome | Responsibility after return |
-| --- | --- |
-| Accepted | Executor runs the batch and reports completion |
-| Rejected | Caller receives the detached batch; execution ownership is released |
-| Stopped | No batch is detached; requests remain pending |
-
-The current design does not automatically requeue rejected work. Returning it explicitly avoids losing the batch while leaving retry policy to the caller. Automatic requeue is a possible future policy, but must account for ordering, cancellation handles, and retry storms.
-
-The executor must report ordinary rejection explicitly and guarantee that rejected work will never execute. An unexpected runtime exception or null result is treated as uncertain acceptance. The exception carries the attempt and detached batch; the scheduler does not assume that it is safe to release or retry. A later completion may still arrive.
-
-Likewise, a caller timeout is evidence that waiting ended, not evidence that execution stopped. Reclaiming a slot on that basis can admit a third batch while the original two are still executing.
-
-## Investigating idle capacity with ready work
-
-A separate simulator offered a useful diagnostic exercise: bursts supplied 32 ready batches per second, while two backend timers modeled 40 ms execution per batch. The faulty completion path returned capacity without notifying the waiting scheduler.
-
-The first useful question was not “which primitive is faster?” It was:
-
-> How long does ready work coexist with an available execution slot?
-
-That measurement separates insufficient capacity from a scheduler that is failing to use capacity already available.
-
-| Metric | Before notification fix | Three runs after fix |
+| Choice | Benefit | Cost or limitation |
 | --- | --- | --- |
-| Completed batches/sec | 8 | About 32 |
-| Backlog at measurement cutoff | 288 | 0 |
-| p95 ready-to-start delay | 8,503 ms | 135–136 ms |
-| Ready work with free capacity, cumulative | 9,881 ms | 93–115 ms |
-| Slot occupancy | 17.69% | 69.88–70.10% |
+| One shared lock | Straightforward atomic queue/ownership transitions | Contention must be measured under realistic load |
+| Active map instead of a separate counter | Identity and capacity share one representation | Every access must follow the synchronization contract |
+| Requests stay pending until commitment | Cancellation remains meaningful while waiting; no detached backlog to recover | Selection must be recomputed after waits |
+| Executor called outside the lock | Backend latency and callbacks do not hold queue coordination hostage | Ownership must be established before the call |
+| Explicit rejected-batch result | Work is returned to an identifiable owner | Caller must choose retry, cancellation, or failure reporting |
+| Retain ownership on uncertain acceptance | Avoids releasing capacity while work might still run | Missing completion can stall capacity; recovery is unresolved |
 
-Each run used a 12-second measurement window and accepted 384 batches. The corrected runs completed all 384 within that window. The faulty run completed 96, leaving 288 queued at cutoff; the harness drained afterward.
+A semaphore can count permits, but does not by itself provide attempt identity, commitment, or idempotent cleanup. The map and lock are one understandable composition for this exercise, not a claim that they are universally faster.
 
-These are local simulation observations. They do not measure GPU utilization, TTFT, model quality, or integrated-scheduler performance. Latency samples include only started batches, so backlog must be read alongside percentiles. The simulator also allocates diagnostic strings under its lock, and JVM warmup and host scheduling affect timings.
+Ordinary rejection must explicitly guarantee that work will never execute. Unexpected runtime exceptions and null results are treated as uncertain submission; the exception carries the detached batch and attempt ID. Automatic release or retry would require stronger evidence.
 
-The evidence supported a notification defect. Thread observations and event order were needed to distinguish that from lock contention or backend saturation.
+## Evidence and remaining work
 
-## A second incident: no progress despite correct-looking methods
+The current scheduler suite has six passing tests: five shutdown/handoff tests and the caller-timeout ownership test. The shutdown tests include deterministic orderings and one concurrent start-gate trial with bounded waits, failure propagation, and worker cleanup. This is evidence for those scenarios, not an exhaustive concurrency proof.
 
-The deadlock exercise combined a scheduler and a simulated memory-budget manager. Dispatch acquired the scheduler lock before the memory lock. Completion acquired the memory lock and called back into scheduler cleanup.
+Temporary smoke checks also exercised accepted dispatch, inline/duplicate completion, rejection cleanup, and stopped dispatch. The stale-candidate correction compiled, but a committed regression test for cancellation while capacity is full remains outstanding.
 
-```text
-Dispatch thread:   owns Scheduler -> waits for Memory
-Completion thread: owns Memory    -> waits for Scheduler
-```
+Separate [performance](https://github.com/galt-k/galt-projects/tree/main/java/concurrency-lab/problem-003-inference-batch-scheduler/performance-investigation) and [deadlock](https://github.com/galt-k/galt-projects/tree/main/java/concurrency-lab/problem-003-inference-batch-scheduler/deadlock-investigation) exercises explore progress and lock coordination. Their current implementations contain the fixes. The performance simulator's baseline and incident modes therefore no longer reproduce the historical before/after defect. Those historical numbers are not used here as evidence of integrated-scheduler performance.
 
-Each method could appear locally reasonable. The failure was the composition.
+Before connecting a real backend, the work remaining includes queued-request shutdown policy, full termination, safe visibility for the public shutdown getter, caller-result delivery and cancellation, bounded admission, and recovery from uncertain acceptance. The integrated path also needs load measurements and tests for cancellation during capacity waiting. This prototype has no crash-durability guarantee.
 
-Thread diagnostics established the ownership cycle. The structural fix was consistent acquisition order: both paths acquire scheduler state before memory state. Reentrancy permits the completion thread to enter scheduler cleanup again while already owning that lock; it does not resolve a cycle between different threads.
+## The lesson to carry forward
 
-The harness used interruptible lock acquisition to unwind the stalled workers after saving diagnostics. That made the experiment stoppable. It did not prevent the deadlock.
+An execution slot represents an obligation that persists until the work is definitely rejected or stopped. A caller deadline, a disconnected client, and an execution-completion event provide different evidence and should drive different transitions.
 
-## What has been verified, and what has not
+Making those distinctions explicit gave the Java implementation its structure: register before callbacks, commit before detachment, validate and remove ownership atomically, and refresh decisions after waits. The next step is to test each boundary under failure and measure the integrated system before drawing throughput conclusions.
 
-Five shutdown/handoff tests passed, including deterministic orderings and a concurrent start-gate scenario. The concurrent test used two readiness/start latches, futures to propagate worker failures, bounded waits, and executor cleanup. One successful race trial is not proof that every interleaving is correct.
-
-Temporary smoke checks covered accepted dispatch, inline and duplicate completion, definite rejection, and stopped dispatch. The stale-candidate correction compiled, but its cancellation-during-capacity-wait regression remains to be written.
-
-The next verification work is concrete: hold both execution slots, block another dispatch, cancel some or all pending requests, release capacity, and verify that selection is recomputed without losing work or leaking ownership. Lifecycle tests must follow the queued-work shutdown decision.
-
-## The implementation lesson
-
-The hardest translation into Java was deciding which statements must form one protected transition and which observations expire at a wait. The lock, condition, map, callback, and future each solve a different part of that problem.
-
-A useful review starts with four questions: who owns this work, what event transfers responsibility, what evidence permits cleanup, and what can change while this thread is waiting?
-
-For this scheduler, those questions led to a small explicit ownership model. That model is the starting point for correctness; tests and measured behavior determine whether the implementation actually preserves it.
-
-The [Java source and exercises](https://github.com/galt-k/galt-projects/tree/main/java/concurrency-lab) and [engineering design document](https://github.com/galt-k/galt-projects/blob/main/java/concurrency-lab/problem-003-inference-batch-scheduler/design.md) include the current implementation, investigation harnesses, and unresolved decisions.
+Explore the [implementation and tests](https://github.com/galt-k/galt-projects/tree/main/java/concurrency-lab/problem-003-inference-batch-scheduler) and the [full engineering design](https://github.com/galt-k/galt-projects/blob/main/java/concurrency-lab/problem-003-inference-batch-scheduler/design.md).
