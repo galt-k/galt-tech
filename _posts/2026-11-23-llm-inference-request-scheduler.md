@@ -22,6 +22,8 @@ I built a Java 21 scheduler to study those boundaries. The implementation groups
 
 This article describes the design and the reasoning behind it. The implementation is a learning prototype with incomplete shutdown semantics. Its backend is an abstraction; the performance results below come from a timer-based simulator, not a model server or GPU benchmark.
 
+**Code and design:** [Java implementation and exercises](https://github.com/galt-k/galt-projects/tree/main/java/concurrency-lab) · [Design document](https://github.com/galt-k/galt-projects/blob/main/java/concurrency-lab/problem-003-inference-batch-scheduler/design.md)
+
 ## Where the scheduler sits
 
 A chat or agent system has several kinds of scheduling. An agent orchestrator decides which model call or tool invocation happens next. A serving layer decides whether a model request can enter the system and when to submit it. An inference engine decides how to execute prefill and decode against finite compute and memory.
